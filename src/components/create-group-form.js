@@ -207,6 +207,7 @@ export default function CreateGroupForm() {
                   type="date"
                   value={specificDateInput}
                   onChange={(event) => setSpecificDateInput(event.target.value)}
+                  aria-label="Add a specific date"
                   className="input-field min-w-0 flex-1"
                 />
                 <button

@@ -43,6 +43,25 @@ body {
   background: rgba(180, 83, 9, 0.18);
 }
 
+button:not(:disabled),
+label[for],
+[role="button"] {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(180, 83, 9, 0.7);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 .panel {
   border: 1px solid var(--line);
   background: var(--panel);

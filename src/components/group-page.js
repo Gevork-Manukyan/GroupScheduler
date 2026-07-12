@@ -775,6 +775,8 @@ export default function GroupPage({ groupId, initialGroup }) {
             <input
               readOnly
               value={shareUrl}
+              aria-label="Group link"
+              onFocus={(event) => event.target.select()}
               className="input-field min-w-0 flex-1"
             />
             <button
