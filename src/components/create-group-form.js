@@ -253,8 +253,8 @@ export default function CreateGroupForm() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm leading-6 text-[var(--muted)]">
-            The next page gives you a shareable link and stores all responses in
-            Appwrite.
+            The next page gives you a shareable link you can send to your
+            group.
           </p>
           <button
             type="submit"

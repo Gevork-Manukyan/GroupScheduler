@@ -431,8 +431,8 @@ function CalendarWorkspace({
               Everything in one calendar
             </h2>
             <p className="max-w-3xl text-sm leading-6 text-[var(--muted)]">
-              Click any included date to mark yourself busy. The cell colors and
-              counts update from the same group data used in list view.
+              Click any included date to mark yourself busy. The colors and
+              counts update as people respond.
             </p>
           </div>
         </div>
@@ -790,8 +790,8 @@ export default function GroupPage({ groupId, initialGroup }) {
             </button>
           </div>
           <p className="text-sm leading-6 text-[var(--muted)]">
-            Responses from this browser stay editable later using a local saved
-            edit token. No account required.
+            Responses from this browser stay editable later on this device. No
+            account required.
           </p>
         </div>
       </div>
@@ -805,7 +805,7 @@ export default function GroupPage({ groupId, initialGroup }) {
             Switch between list and calendar layouts
           </h2>
           <p className="text-sm leading-6 text-[var(--muted)]">
-            Both views use the same busy-date data and save flow.
+            Both views show the same availability, whichever you prefer.
           </p>
         </div>
 
