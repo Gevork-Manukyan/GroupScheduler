@@ -11,7 +11,16 @@ function resolveSiteUrl(value) {
     : `https://${trimmed}`;
 
   try {
-    return new URL(withScheme).origin;
+    const url = new URL(withScheme);
+
+    // Never canonicalize to a Vercel preview/default domain. Those redirect
+    // (308) to the custom domain, and social crawlers do not follow redirects
+    // for og:image, which breaks link-preview thumbnails.
+    if (url.hostname.endsWith(".vercel.app")) {
+      return FALLBACK_SITE_URL;
+    }
+
+    return url.origin;
   } catch {
     return FALLBACK_SITE_URL;
   }
