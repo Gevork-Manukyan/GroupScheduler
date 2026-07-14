@@ -1,5 +1,8 @@
 import "./app.css";
 
+import Link from "next/link";
+
+import BrandMark from "@/components/brand-mark";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata = {
@@ -22,6 +25,10 @@ export const metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-touch-icon.png" }],
+  },
   openGraph: {
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
@@ -30,10 +37,10 @@ export const metadata = {
     type: "website",
     images: [
       {
-        url: "/group-scheduler.png",
-        width: 1145,
-        height: 822,
-        alt: "Group Scheduler landing page",
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME,
       },
     ],
   },
@@ -41,7 +48,7 @@ export const metadata = {
     card: "summary_large_image",
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
-    images: ["/group-scheduler.png"],
+    images: ["/og.png"],
   },
 };
 
@@ -68,7 +75,6 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <link rel="icon" href="/favicon.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -76,7 +82,21 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <header className="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2.5 transition hover:opacity-80"
+            aria-label={`${SITE_NAME} home`}
+          >
+            <BrandMark size={38} />
+            <span className="text-lg font-extrabold tracking-tight text-[var(--text)]">
+              {SITE_NAME}
+            </span>
+          </Link>
+        </header>
+        {children}
+      </body>
     </html>
   );
 }
