@@ -2,6 +2,10 @@
 
 A small Next.js app for collecting date-specific availability from a group and showing which dates work for everyone.
 
+**Live app: [groupscheduler.gevorkmanukyan.com](https://groupscheduler.gevorkmanukyan.com/)**
+
+![Group Scheduler landing page](public/group-scheduler.png)
+
 ## What it does
 
 - Create a group with a name and either a date range or specific dates
