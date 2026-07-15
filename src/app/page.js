@@ -2,7 +2,7 @@ import CreateGroupForm from "@/components/create-group-form";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="space-y-6">
           <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)] shadow-sm backdrop-blur">

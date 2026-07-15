@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center gap-6 px-4 py-10 text-center sm:px-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-10 text-center sm:px-6">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
         Not found
       </p>
