@@ -1,6 +1,7 @@
 import "./app.css";
 
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/next";
 
 import BrandMark from "@/components/brand-mark";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
@@ -96,6 +97,7 @@ export default function RootLayout({ children }) {
           </Link>
         </header>
         {children}
+        <Analytics />
       </body>
     </html>
   );
