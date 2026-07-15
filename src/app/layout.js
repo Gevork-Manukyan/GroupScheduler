@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 
 import BrandMark from "@/components/brand-mark";
+import SiteFooter from "@/components/site-footer";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata = {
@@ -97,6 +98,7 @@ export default function RootLayout({ children }) {
           </Link>
         </header>
         {children}
+        <SiteFooter />
         <Analytics />
       </body>
     </html>
