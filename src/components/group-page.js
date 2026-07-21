@@ -66,14 +66,19 @@ function formatMonthLabel(year, monthIndex) {
   }).format(new Date(year, monthIndex, 1));
 }
 
+// "Sat Jul 25", deliberately without the comma Intl puts after the weekday —
+// these get joined into comma-separated lists, and a comma inside each item
+// makes the list unreadable.
 function formatShortLabel(value) {
   const { year, monthIndex, day } = getDateParts(value);
-
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
+  const date = new Date(year, monthIndex, day);
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date);
+  const monthDay = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-  }).format(new Date(year, monthIndex, day));
+  }).format(date);
+
+  return `${weekday} ${monthDay}`;
 }
 
 /*
@@ -155,7 +160,7 @@ function joinLabels(labels) {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
-function CalendarGrid({ months, responseCount, isPicked, onToggle }) {
+function CalendarGrid({ months, total, liveByDate, onToggle }) {
   return (
     <div className="flex flex-col gap-[18px]">
       {months.map((month) => (
@@ -189,8 +194,8 @@ function CalendarGrid({ months, responseCount, isPicked, onToggle }) {
                 );
               }
 
-              const picked = isPicked(cell.date);
-              const lit = cell.summary.allAvailable;
+              const live = liveByDate.get(cell.date);
+              const { picked, all: lit } = live;
 
               return (
                 <button
@@ -198,17 +203,20 @@ function CalendarGrid({ months, responseCount, isPicked, onToggle }) {
                   type="button"
                   onClick={() => onToggle(cell.date)}
                   aria-pressed={picked}
-                  aria-label={`${formatShortLabel(cell.date)} — ${cell.summary.availableCount} of ${responseCount} can make it${picked ? ", including you" : ""}`}
+                  aria-label={`${formatShortLabel(cell.date)} — ${live.count} of ${total} can make it${picked ? ", including you" : ""}`}
                   style={
                     lit
                       ? undefined
                       : {
-                          backgroundImage: `linear-gradient(0deg, rgba(255,194,75,${litAlpha(cell.summary.availableCount, responseCount)}), rgba(255,194,75,${litAlpha(cell.summary.availableCount, responseCount)}))`,
+                          backgroundImage: `linear-gradient(0deg, rgba(255,194,75,${litAlpha(live.count, total)}), rgba(255,194,75,${litAlpha(live.count, total)}))`,
                         }
                   }
+                  /* the ring shows on lit cells too — lit and picked can
+                     disagree before you have replied, and a gold cell with no
+                     ring would otherwise look identical either way */
                   className={`relative flex aspect-square min-h-11 items-center justify-center rounded-[4px] border font-mono text-[0.8125rem] tabular-nums transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-95 ${
                     lit
-                      ? "border-lamp-soft bg-gradient-to-b from-lamp-soft to-lamp text-[#1a1204] shadow-lit"
+                      ? `border-lamp-soft bg-gradient-to-b from-lamp-soft to-lamp text-[#1a1204] ${picked ? "shadow-[inset_0_0_0_2px_rgba(22,32,27,0.5)]" : "shadow-lit"}`
                       : picked
                         ? "border-box-rule bg-cell-mine text-[#dfe6e0] shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)] hover:border-lamp-soft"
                         : "border-cell-shut-line bg-cell-shut text-[#dfe6e0] hover:border-lamp-soft"
@@ -225,31 +233,30 @@ function CalendarGrid({ months, responseCount, isPicked, onToggle }) {
   );
 }
 
-function DateList({ dateSummaries, responseCount, isPicked, onToggle }) {
+function DateList({ dateSummaries, total, liveByDate, onToggle }) {
   return (
     <div className="flex flex-col gap-1">
       {dateSummaries.map((summary) => {
-        const picked = isPicked(summary.date);
-        const ratio = responseCount
-          ? (summary.availableCount / responseCount) * 100
-          : 0;
+        const live = liveByDate.get(summary.date);
+        const ratio = total ? (live.count / total) * 100 : 0;
 
         return (
           <button
             key={summary.date}
             type="button"
             onClick={() => onToggle(summary.date)}
-            aria-pressed={picked}
-            className={`grid min-h-[46px] w-full grid-cols-[5.75rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-colors hover:border-lamp-soft ${
-              summary.allAvailable
+            aria-pressed={live.picked}
+            aria-label={`${formatShortLabel(summary.date)} — ${live.count} of ${total} can make it${live.picked ? ", including you" : ""}`}
+            className={`grid min-h-[46px] w-full grid-cols-[5.25rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-colors hover:border-lamp-soft ${
+              live.all
                 ? "border-lamp-soft/55 bg-cell-shut"
-                : picked
+                : live.picked
                   ? "border-box-rule bg-cell-mine"
                   : "border-cell-shut-line bg-cell-shut"
             }`}
           >
             <span
-              className={`whitespace-nowrap ${picked ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
+              className={`whitespace-nowrap ${live.picked ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
             >
               {formatShortLabel(summary.date)}
             </span>
@@ -263,9 +270,9 @@ function DateList({ dateSummaries, responseCount, isPicked, onToggle }) {
             </span>
 
             <span
-              className={`whitespace-nowrap ${summary.allAvailable ? "text-lamp-soft" : "text-box-ink"}`}
+              className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-box-ink"}`}
             >
-              {summary.availableCount} of {responseCount}
+              {live.count} of {total}
             </span>
           </button>
         );
@@ -424,19 +431,69 @@ export default function GroupPage({ groupId, initialGroup }) {
 
   const calendarMonths = buildCalendarMonths(group.dateSummaries);
   const pickedSet = new Set(availableDates);
-  const isPicked = (date) => pickedSet.has(date);
+
+  /*
+    The snapshot counts only what has been saved. Rebase it against the current
+    selection so the calendar answers "what happens if I save this" while you
+    tap, instead of freezing on the last save — otherwise unpicking a date that
+    is already lit leaves it lit, and nothing on screen changes.
+  */
+  const savedResponse = editor
+    ? group.responses.find((response) => response.id === editor.responseId)
+    : null;
+  const savedMine = new Set(savedResponse?.availableDates || []);
+
+  // You join the denominator once you start picking. If you already saved,
+  // responseCount counts you and there is nothing to add.
+  const countsMeYet = Boolean(savedResponse);
+  const liveTotal =
+    group.responseCount + (!countsMeYet && availableDates.length > 0 ? 1 : 0);
+
+  const liveByDate = new Map(
+    group.dateSummaries.map((summary) => {
+      const wasMine = savedMine.has(summary.date);
+      const isMine = pickedSet.has(summary.date);
+      const count = summary.availableCount - (wasMine ? 1 : 0) + (isMine ? 1 : 0);
+
+      return [
+        summary.date,
+        {
+          count,
+          picked: isMine,
+          all: liveTotal >= 2 && count === liveTotal,
+        },
+      ];
+    }),
+  );
+
+  const liveCommon = group.dateSummaries
+    .filter((summary) => liveByDate.get(summary.date).all)
+    .map((summary) => summary.date);
+
+  const savedList = [...savedMine].sort();
+  const unsaved =
+    savedList.length !== availableDates.length ||
+    savedList.some((date, index) => date !== availableDates[index]);
 
   let answer;
 
-  if (group.responseCount === 0) {
+  if (liveTotal === 0) {
     answer = "No replies yet. Tap the dates you can make.";
-  } else if (group.responseCount === 1) {
+  } else if (liveTotal === 1) {
     answer = "Waiting for the first reply from anyone else.";
-  } else if (group.commonDates.length === 0) {
+  } else if (liveCommon.length === 0) {
     answer = "No date works for everyone yet.";
   } else {
     answer = null;
   }
+
+  // Past three, naming them all makes a sentence nobody reads. The calendar
+  // and the list both already show which ones.
+  const answerDates =
+    liveCommon.length <= 3
+      ? joinLabels(liveCommon.map(formatShortLabel))
+      : `${liveCommon.length} dates`;
+  const answerVerb = liveCommon.length === 1 ? "works" : "work";
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-6 sm:px-6 lg:px-10">
@@ -506,13 +563,9 @@ export default function GroupPage({ groupId, initialGroup }) {
           >
             {answer ?? (
               <>
-                <span className="font-medium text-lamp-soft">
-                  {joinLabels(
-                    group.commonDates.map((date) => formatShortLabel(date.date)),
-                  )}
-                </span>
-                {group.commonDates.length === 1 ? " works" : " work"} for all{" "}
-                {group.responseCount} who have replied.
+                <span className="font-medium text-lamp-soft">{answerDates}</span>{" "}
+                {answerVerb} for all {liveTotal}
+                {unsaved ? ", once you save." : " who have replied."}
               </>
             )}
           </p>
@@ -520,15 +573,15 @@ export default function GroupPage({ groupId, initialGroup }) {
           {viewMode === "calendar" ? (
             <CalendarGrid
               months={calendarMonths}
-              responseCount={group.responseCount}
-              isPicked={isPicked}
+              total={liveTotal}
+              liveByDate={liveByDate}
               onToggle={toggleDate}
             />
           ) : (
             <DateList
               dateSummaries={group.dateSummaries}
-              responseCount={group.responseCount}
-              isPicked={isPicked}
+              total={liveTotal}
+              liveByDate={liveByDate}
               onToggle={toggleDate}
             />
           )}
