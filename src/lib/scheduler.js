@@ -1,6 +1,11 @@
 const GROUP_NAME_LIMIT = 80;
 const PARTICIPANT_NAME_LIMIT = 50;
 export const MAX_GROUP_RANGE_DAYS = 60;
+
+// A single reply is not a consensus. Without this, the first person to answer
+// makes every date they pick read as "works for everyone", and the claim then
+// evaporates as more people reply.
+const MIN_CONSENSUS_RESPONSES = 2;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export class HttpError extends Error {
@@ -251,7 +256,9 @@ export function buildGroupSnapshot(groupRow, responseRows) {
       label: formatDateLabel(date),
       availableCount,
       busyCount: totalParticipants - availableCount,
-      allAvailable: totalParticipants > 0 && availableCount === totalParticipants,
+      allAvailable:
+        totalParticipants >= MIN_CONSENSUS_RESPONSES &&
+        availableCount === totalParticipants,
     };
   });
 

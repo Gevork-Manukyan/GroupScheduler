@@ -1,23 +1,42 @@
 @import "tailwindcss";
 
-:root {
-  --bg: #f4efe6;
-  --bg-strong: #efe5d4;
-  --panel: rgba(255, 255, 255, 0.8);
-  --panel-strong: rgba(255, 255, 255, 0.94);
-  --panel-soft: #f6f1e8;
-  --text: #1f2937;
-  --muted: #667085;
-  --line: #decfb7;
-  --accent: #b45309;
-  --accent-strong: #92400e;
-  --accent-soft: #fff0d6;
-  --success: #136f3a;
-  --success-soft: #e7f8ee;
-  --success-line: #b9e5c9;
-  --danger: #b42318;
-  --danger-soft: #feeceb;
-  --danger-line: #f5c8c5;
+/*
+  Punch-card direction. Each reply is a card: days a person can make are
+  punched holes, days they can't are solid stock. Stack the cards, hold them
+  to the light, and light passes only where every card is punched.
+
+  The page is light with a single dark module (the stack) carrying all the
+  contrast. Amber means exactly one thing: this date works for everyone.
+*/
+@theme {
+  --color-paper: #e9ebe4;
+  --color-surface: #fbfcfa;
+  --color-ink: #16201b;
+  --color-ink-2: #4c564e;
+  --color-rule: #c6ccbf;
+  --color-lamp: #ffc24b;
+  --color-lamp-soft: #ffe7b0;
+  --color-flag: #a4331f;
+  --color-flag-soft: #f9e9e6;
+
+  /* The stack is a physical object; these never follow the page theme. */
+  --color-box: #16201b;
+  --color-box-rule: #33413a;
+  --color-box-ink: #8d9a91;
+  --color-cell-open: #33423a;
+  --color-cell-open-line: #4a5d52;
+  --color-cell-shut: #0b100d;
+  --color-cell-shut-line: #2b3830;
+  --color-cell-mine: #1b2620;
+
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-card:
+    0 1px 0 rgba(22, 32, 27, 0.06), 0 12px 28px -18px rgba(22, 32, 27, 0.5);
+  --shadow-lit:
+    0 0 18px -2px rgba(255, 194, 75, 0.5), 0 0 44px -10px rgba(255, 194, 75, 0.35);
 }
 
 * {
@@ -33,16 +52,16 @@ body {
   flex-direction: column;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(255, 250, 240, 0.95), transparent 38%),
-    radial-gradient(circle at right 20%, rgba(245, 208, 146, 0.34), transparent 26%),
-    linear-gradient(180deg, var(--bg) 0%, #f7f5ef 100%);
-  color: var(--text);
-  font-family: "Manrope", sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 ::selection {
-  background: rgba(180, 83, 9, 0.18);
+  background: rgba(255, 194, 75, 0.35);
 }
 
 button:not(:disabled),
@@ -51,144 +70,164 @@ label[for],
   cursor: pointer;
 }
 
-button:focus-visible,
-a:focus-visible {
-  outline: 2px solid rgba(180, 83, 9, 0.7);
+:focus-visible {
+  outline: 2px solid var(--color-lamp);
   outline-offset: 2px;
+  border-radius: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
 }
 
-.panel {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  backdrop-filter: blur(10px);
-  border-radius: 2rem;
-  padding: 1.5rem;
-  box-shadow: 0 18px 50px rgba(95, 74, 39, 0.08);
-}
+/*
+  Component classes stay flat and single-purpose so Tailwind utilities always
+  win on the element. The previous stylesheet mixed element and class
+  selectors, which is where the padding collisions came from.
+*/
+@layer components {
+  .card {
+    border: 1px solid var(--color-rule);
+    border-radius: 8px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
 
-.panel-strong {
-  border: 1px solid rgba(168, 124, 62, 0.2);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 251, 245, 0.98) 100%);
-  border-radius: 2rem;
-  padding: 1.75rem;
-  box-shadow:
-    0 24px 80px rgba(95, 74, 39, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
-}
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-ink-2);
+  }
 
-.input-field {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  background: white;
-  padding: 0.9rem 1rem;
-  color: var(--text);
-  outline: none;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
-}
+  .input-field {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 12px;
+    border: 1px solid var(--color-rule);
+    border-radius: 6px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
 
-.input-field:focus {
-  border-color: rgba(180, 83, 9, 0.65);
-  box-shadow: 0 0 0 4px rgba(180, 83, 9, 0.14);
-}
+  .input-field::placeholder {
+    color: var(--color-ink-2);
+    opacity: 0.75;
+  }
 
-.button-primary,
-.button-secondary,
-.chip {
-  border: 0;
-  font: inherit;
-}
+  .input-field:focus {
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px rgba(255, 194, 75, 0.3);
+  }
 
-.button-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #c26b16 0%, #9a4f0d 100%);
-  color: white;
-  padding: 0.9rem 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  box-shadow: 0 14px 30px rgba(180, 83, 9, 0.24);
-  transition:
-    transform 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease;
-}
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 18px;
+    border: 1px solid var(--color-ink);
+    border-radius: 6px;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    transition:
+      background-color 140ms ease,
+      opacity 140ms ease;
+  }
 
-.button-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 34px rgba(180, 83, 9, 0.28);
-}
+  .btn:hover:not(:disabled) {
+    background: #0c130f;
+  }
 
-.button-primary:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
 
-.button-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.84);
-  color: var(--text);
-  padding: 0.9rem 1.2rem;
-  font-weight: 700;
-  transition:
-    border-color 150ms ease,
-    transform 150ms ease;
-}
+  .btn-quiet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--color-rule);
+    border-radius: 6px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: border-color 140ms ease;
+  }
 
-.button-secondary:hover {
-  transform: translateY(-1px);
-  border-color: rgba(180, 83, 9, 0.45);
-}
+  .btn-quiet:hover:not(:disabled) {
+    border-color: var(--color-ink);
+  }
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: white;
-  padding: 0.7rem 1rem;
-  color: var(--text);
-  text-align: left;
-  transition:
-    border-color 150ms ease,
-    transform 150ms ease;
-}
+  .btn-quiet:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 
-.chip:hover {
-  transform: translateY(-1px);
-  border-color: rgba(180, 83, 9, 0.45);
-}
+  /* The dark module. One clipped corner, the way a punch card is notched so a
+     misfiled one shows up in the stack. */
+  .stack {
+    --clip: 22px;
+    border: 1px solid var(--color-box-rule);
+    border-radius: 8px;
+    background: var(--color-box);
+    box-shadow: var(--shadow-card);
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--clip)) 0,
+      100% var(--clip),
+      100% 100%,
+      0 100%
+    );
+  }
 
-.result-pill {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  border-radius: 1.5rem;
-  border: 1px solid var(--success-line);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0.9rem 1rem;
-}
+  @media (min-width: 900px) {
+    .stack {
+      --clip: 26px;
+    }
+  }
 
-code,
-pre,
-.mono {
-  font-family: "IBM Plex Mono", monospace;
+  .notice {
+    border-radius: 6px;
+    padding: 11px 13px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .notice-error {
+    border: 1px solid rgba(164, 51, 31, 0.35);
+    background: var(--color-flag-soft);
+    color: var(--color-flag);
+  }
+
+  .notice-quiet {
+    border: 1px dashed var(--color-rule);
+    background: color-mix(in srgb, var(--color-paper) 60%, var(--color-surface));
+    color: var(--color-ink-2);
+  }
 }

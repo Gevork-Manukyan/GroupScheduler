@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function getStorageKey(groupId) {
   return `group-scheduler:${groupId}:editor`;
@@ -66,6 +66,21 @@ function formatMonthLabel(year, monthIndex) {
   }).format(new Date(year, monthIndex, 1));
 }
 
+function formatShortLabel(value) {
+  const { year, monthIndex, day } = getDateParts(value);
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(year, monthIndex, day));
+}
+
+/*
+  Lay each month out in weeks, then drop any week holding no group date. A
+  60-day range spanning three months would otherwise bury a phone screen in
+  empty grid.
+*/
 function buildCalendarMonths(dateSummaries) {
   const summaryMap = new Map(
     dateSummaries.map((summary) => [summary.date, summary]),
@@ -74,552 +89,219 @@ function buildCalendarMonths(dateSummaries) {
     ...new Set(dateSummaries.map((summary) => toMonthKey(summary.date))),
   ].sort();
 
-  return monthKeys.map((monthKey) => {
-    const [yearValue, monthValue] = monthKey.split("-").map(Number);
-    const year = yearValue;
-    const monthIndex = monthValue - 1;
-    const firstDay = new Date(year, monthIndex, 1).getDay();
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const cells = [];
+  return monthKeys
+    .map((monthKey) => {
+      const [year, monthValue] = monthKey.split("-").map(Number);
+      const monthIndex = monthValue - 1;
+      const firstDay = new Date(year, monthIndex, 1).getDay();
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const cells = [];
 
-    for (let index = 0; index < firstDay; index += 1) {
-      cells.push({
-        id: `${monthKey}-pad-start-${index}`,
-        isPadding: true,
-      });
-    }
+      for (let index = 0; index < firstDay; index += 1) {
+        cells.push({ id: `${monthKey}-pad-${index}`, isPadding: true });
+      }
 
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = toDateInputValue(year, monthIndex, day);
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = toDateInputValue(year, monthIndex, day);
 
-      cells.push({
-        id: date,
-        date,
-        day,
-        summary: summaryMap.get(date) || null,
-      });
-    }
+        cells.push({
+          id: date,
+          date,
+          day,
+          summary: summaryMap.get(date) || null,
+        });
+      }
 
-    while (cells.length % 7 !== 0) {
-      cells.push({
-        id: `${monthKey}-pad-end-${cells.length}`,
-        isPadding: true,
-      });
-    }
+      while (cells.length % 7 !== 0) {
+        cells.push({ id: `${monthKey}-pad-end-${cells.length}`, isPadding: true });
+      }
 
-    return {
-      key: monthKey,
-      label: formatMonthLabel(year, monthIndex),
-      cells,
-    };
-  });
+      const liveCells = [];
+
+      for (let start = 0; start < cells.length; start += 7) {
+        const week = cells.slice(start, start + 7);
+
+        if (week.some((cell) => cell.summary)) {
+          liveCells.push(...week);
+        }
+      }
+
+      return {
+        key: monthKey,
+        label: formatMonthLabel(year, monthIndex),
+        cells: liveCells,
+      };
+    })
+    .filter((month) => month.cells.length > 0);
 }
 
-function getCalendarCellClass(summary, responseCount, isBusy) {
-  if (!summary) {
-    return "cursor-default border border-transparent bg-transparent text-[var(--muted)] opacity-25 shadow-none";
+/*
+  Light leaks slowly and then all at once. A near-miss is not a match, so the
+  curve keeps partial agreement dim and lets a real consensus carry the glow.
+*/
+function litAlpha(availableCount, responseCount) {
+  if (!responseCount) {
+    return 0;
   }
 
-  if (isBusy) {
-    return "border border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--text)] shadow-sm";
-  }
-
-  if (responseCount === 0) {
-    return "border border-[var(--line)] bg-white text-[var(--text)]";
-  }
-
-  if (summary.allAvailable) {
-    return "border border-[var(--success-line)] bg-[var(--success-soft)] text-[var(--text)]";
-  }
-
-  if (summary.availableCount === 0) {
-    return "border border-[var(--danger-line)] bg-white text-[var(--text)]";
-  }
-
-  return "border border-[var(--line)] bg-white text-[var(--text)]";
+  return (Math.pow(availableCount / responseCount, 2.2) * 0.5).toFixed(3);
 }
 
-function SummaryCard({ label, value, detail }) {
+function joinLabels(labels) {
+  if (labels.length === 1) {
+    return labels[0];
+  }
+
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
+function CalendarGrid({ months, responseCount, isPicked, onToggle }) {
   return (
-    <div className="rounded-3xl border border-[var(--line)] bg-white px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">
-        {value}
-      </p>
-      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{detail}</p>
-    </div>
-  );
-}
-
-function CommonDatesPanel({ commonDates, commonDatesMessage, responseCount }) {
-  return (
-    <div className="panel-strong space-y-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            Results
+    <div className="flex flex-col gap-[18px]">
+      {months.map((month) => (
+        <section key={month.key}>
+          <p className="mb-2 font-mono text-[0.6875rem] font-medium tracking-[0.14em] uppercase text-lamp-soft">
+            {month.label}
           </p>
-          <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-            Common available dates
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            Dates where no one has marked themselves as busy.
-          </p>
-        </div>
-        <p className="text-sm font-medium text-[var(--muted)]">
-          {responseCount} {responseCount === 1 ? "response" : "responses"}
-        </p>
-      </div>
 
-      {commonDatesMessage ? (
-        <div className="rounded-3xl border border-dashed border-[var(--line)] bg-[var(--panel-soft)] px-5 py-6 text-sm leading-6 text-[var(--muted)]">
-          {commonDatesMessage}
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          {commonDates.map((date) => (
-            <div key={date.date} className="result-pill">
-              <span className="font-semibold text-[var(--text)]">
-                {date.label}
+          <div className="mb-[5px] grid grid-cols-7 gap-1">
+            {WEEKDAY_INITIALS.map((initial, index) => (
+              <span
+                key={`${month.key}-dow-${index}`}
+                className="text-center font-mono text-[0.625rem] text-box-ink/75"
+              >
+                {initial}
               </span>
-              <span className="text-sm text-[var(--success)]">
-                Everyone is free
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+            ))}
+          </div>
 
-function ParticipantsPanel({ responses, editorId }) {
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-          Participants
-        </p>
-        <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-          Who has responded
-        </h2>
-      </div>
+          <div className="grid grid-cols-7 gap-[3px] sm:gap-1">
+            {month.cells.map((cell) => {
+              if (cell.isPadding || !cell.summary) {
+                return (
+                  <div
+                    key={cell.id}
+                    aria-hidden="true"
+                    className="flex aspect-square min-h-11 items-center justify-center rounded-[4px] font-mono text-[0.8125rem] text-box-ink/45"
+                  >
+                    {cell.isPadding ? "" : cell.day}
+                  </div>
+                );
+              }
 
-      {responses.length === 0 ? (
-        <p className="text-sm leading-6 text-[var(--muted)]">
-          No one has submitted availability yet.
-        </p>
-      ) : (
-        <div className="grid gap-3">
-          {responses.map((response) => (
-            <div
-              key={response.id}
-              className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-white px-4 py-4"
-            >
-              <div>
-                <p className="font-semibold text-[var(--text)]">
-                  {response.name}
-                </p>
-                <p className="text-sm text-[var(--muted)]">
-                  Busy on {response.busyCount}{" "}
-                  {response.busyCount === 1 ? "date" : "dates"}
-                </p>
-              </div>
-              {editorId === response.id ? (
-                <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
-                  You
-                </span>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ListBreakdownPanel({ group }) {
-  return (
-    <div className="panel space-y-4">
-      <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-          Date breakdown
-        </p>
-        <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-          Availability counts
-        </h2>
-      </div>
-
-      <div className="grid gap-3">
-        {group.dateSummaries.map((date) => {
-          const percentage =
-            group.responseCount > 0
-              ? (date.availableCount / group.responseCount) * 100
-              : 0;
-
-          return (
-            <div
-              key={date.date}
-              className="rounded-3xl border border-[var(--line)] bg-white px-4 py-4"
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-semibold text-[var(--text)]">
-                    {date.label}
-                  </p>
-                  <p className="text-sm text-[var(--muted)]">
-                    {date.availableCount} of {group.responseCount} people are
-                    available
-                  </p>
-                </div>
-                {date.allAvailable ? (
-                  <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--success)]">
-                    Full overlap
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--panel-soft)]">
-                <div
-                  className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ListBusyPicker({
-  group,
-  busyDates,
-  name,
-  onNameChange,
-  onToggleDate,
-  onSubmit,
-  isSaving,
-  editor,
-  feedback,
-  error,
-}) {
-  return (
-    <aside className="panel-strong h-fit">
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-          Your response
-        </p>
-        <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-          Mark every date you are busy.
-        </h2>
-        <p className="text-sm leading-6 text-[var(--muted)]">
-          Leave a date unchecked if you are free.
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-5">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-[var(--text)]">
-            Display name
-          </span>
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            className="input-field"
-            placeholder="Your name"
-            maxLength={50}
-          />
-        </label>
-
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-[var(--text)]">
-            Select busy dates
-          </p>
-
-          <div className="grid gap-3">
-            {group.dateSummaries.map((date) => {
-              const isSelected = busyDates.includes(date.date);
+              const picked = isPicked(cell.date);
+              const lit = cell.summary.allAvailable;
 
               return (
-                <label
-                  key={date.date}
-                  className={`flex cursor-pointer items-start gap-3 rounded-3xl border px-4 py-4 transition ${
-                    isSelected
-                      ? "border-[var(--danger)] bg-[var(--danger-soft)]"
-                      : "border-[var(--line)] bg-white"
+                <button
+                  key={cell.id}
+                  type="button"
+                  onClick={() => onToggle(cell.date)}
+                  aria-pressed={picked}
+                  aria-label={`${formatShortLabel(cell.date)} — ${cell.summary.availableCount} of ${responseCount} can make it${picked ? ", including you" : ""}`}
+                  style={
+                    lit
+                      ? undefined
+                      : {
+                          backgroundImage: `linear-gradient(0deg, rgba(255,194,75,${litAlpha(cell.summary.availableCount, responseCount)}), rgba(255,194,75,${litAlpha(cell.summary.availableCount, responseCount)}))`,
+                        }
+                  }
+                  className={`relative flex aspect-square min-h-11 items-center justify-center rounded-[4px] border font-mono text-[0.8125rem] tabular-nums transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-95 ${
+                    lit
+                      ? "border-lamp-soft bg-gradient-to-b from-lamp-soft to-lamp text-[#1a1204] shadow-lit"
+                      : picked
+                        ? "border-box-rule bg-cell-mine text-[#dfe6e0] shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)] hover:border-lamp-soft"
+                        : "border-cell-shut-line bg-cell-shut text-[#dfe6e0] hover:border-lamp-soft"
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleDate(date.date)}
-                    className="mt-1 h-4 w-4 accent-[var(--danger)]"
-                  />
-                  <div>
-                    <p className="font-semibold text-[var(--text)]">
-                      {date.label}
-                    </p>
-                    <p className="text-sm text-[var(--muted)]">
-                      Marked busy by {date.busyCount} of {group.responseCount}{" "}
-                      responses
-                    </p>
-                  </div>
-                </label>
+                  {cell.day}
+                </button>
               );
             })}
           </div>
-        </div>
-
-        {feedback ? (
-          <p className="rounded-2xl border border-[var(--success-line)] bg-[var(--success-soft)] px-4 py-3 text-sm text-[var(--success)]">
-            {feedback}
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        ) : null}
-
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="button-primary w-full"
-        >
-          {isSaving
-            ? "Saving..."
-            : editor
-              ? "Update busy dates"
-              : "Save busy dates"}
-        </button>
-      </form>
-    </aside>
+        </section>
+      ))}
+    </div>
   );
 }
 
-function CalendarWorkspace({
-  group,
-  calendarMonths,
-  commonDatesMessage,
-  busyDates,
-  name,
-  onNameChange,
-  onToggleDate,
-  onSubmit,
-  isSaving,
-  editor,
-  feedback,
-  error,
-}) {
-  const busyDateSet = new Set(busyDates);
-
+function DateList({ dateSummaries, responseCount, isPicked, onToggle }) {
   return (
-    <section className="space-y-6">
-      <form onSubmit={onSubmit} className="panel-strong space-y-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-              Calendar workspace
-            </p>
-            <h2 className="text-3xl font-bold tracking-tight text-[var(--text)]">
-              Everything in one calendar
-            </h2>
-            <p className="max-w-3xl text-sm leading-6 text-[var(--muted)]">
-              Click any included date to mark yourself busy. The colors and
-              counts update as people respond.
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-1">
+      {dateSummaries.map((summary) => {
+        const picked = isPicked(summary.date);
+        const ratio = responseCount
+          ? (summary.availableCount / responseCount) * 100
+          : 0;
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            label="Responses"
-            value={group.responseCount}
-            detail="People who have already filled in this group."
-          />
-          <SummaryCard
-            label="Common dates"
-            value={group.commonDates.length}
-            detail="Dates that still work for everyone."
-          />
-          <SummaryCard
-            label="Your busy dates"
-            value={busyDates.length}
-            detail="Dates you have currently marked as busy."
-          />
-          <SummaryCard
-            label="Group dates"
-            value={group.dates.length}
-            detail="Total dates included in this group."
-          />
-        </div>
-
-        <div className="rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel-soft)] p-4 sm:p-5">
-          <label className="space-y-2">
-            <span className="text-sm font-semibold text-[var(--text)]">
-              Display name
-            </span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => onNameChange(event.target.value)}
-              className="input-field"
-              placeholder="Your name"
-              maxLength={50}
-            />
-          </label>
-        </div>
-
-        <div className="sticky top-3 z-20 rounded-[1.35rem] border border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-3 py-2.5 shadow-[0_16px_36px_rgba(95,74,39,0.12)] backdrop-blur sm:px-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                Your selection
-              </p>
-              <p className="truncate text-sm font-semibold text-[var(--text)] sm:text-base">
-                {busyDates.length}{" "}
-                {busyDates.length === 1 ? "busy date selected" : "busy dates selected"}
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="button-primary shrink-0 whitespace-nowrap px-4 py-2 text-sm sm:min-w-[12rem]"
+        return (
+          <button
+            key={summary.date}
+            type="button"
+            onClick={() => onToggle(summary.date)}
+            aria-pressed={picked}
+            className={`grid min-h-[46px] w-full grid-cols-[5.75rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-colors hover:border-lamp-soft ${
+              summary.allAvailable
+                ? "border-lamp-soft/55 bg-cell-shut"
+                : picked
+                  ? "border-box-rule bg-cell-mine"
+                  : "border-cell-shut-line bg-cell-shut"
+            }`}
+          >
+            <span
+              className={`whitespace-nowrap ${picked ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
             >
-              {isSaving
-                ? "Saving..."
-                : editor
-                  ? "Update"
-                  : "Save"}
-            </button>
-          </div>
-        </div>
+              {formatShortLabel(summary.date)}
+            </span>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-[var(--success-line)] bg-[var(--success-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--success)]">
-            Fully available
-          </span>
-          <span className="rounded-full border border-[var(--danger-line)] bg-[var(--danger-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--danger)]">
-            You marked busy
-          </span>
-          <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-            Included date
-          </span>
-        </div>
+            <span className="h-2 overflow-hidden rounded-full bg-[#1c2620]">
+              {/* the real ratio — the lit curve above is perception, not data */}
+              <span
+                className="block h-full rounded-full bg-lamp transition-[width] duration-200"
+                style={{ width: `${ratio}%` }}
+              />
+            </span>
 
-        {commonDatesMessage ? (
-          <div className="rounded-3xl border border-dashed border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 text-sm leading-6 text-[var(--muted)]">
-            {commonDatesMessage}
-          </div>
-        ) : null}
+            <span
+              className={`whitespace-nowrap ${summary.allAvailable ? "text-lamp-soft" : "text-box-ink"}`}
+            >
+              {summary.availableCount} of {responseCount}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-        {feedback ? (
-          <p className="rounded-2xl border border-[var(--success-line)] bg-[var(--success-soft)] px-4 py-3 text-sm text-[var(--success)]">
-            {feedback}
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="space-y-8">
-          {calendarMonths.map((month) => (
-            <section key={month.key} className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-                    {month.label}
-                  </h3>
-                  <p className="text-sm leading-6 text-[var(--muted)]">
-                    Click any date in the group to toggle your busy status.
-                  </p>
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                  Calendar view
-                </p>
-              </div>
-
-              <div className="-mx-1 overflow-x-auto pb-2">
-                <div className="min-w-[42rem] px-1 sm:min-w-0">
-                  <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                    {WEEKDAY_LABELS.map((label) => (
-                      <div key={`${month.key}-${label}`}>{label}</div>
-                    ))}
-                  </div>
-
-                  <div className="mt-2 grid grid-cols-7 gap-2">
-                    {month.cells.map((cell) =>
-                      cell.isPadding ? (
-                        <div key={cell.id} className="aspect-square rounded-2xl" />
-                      ) : (
-                        <button
-                          key={cell.id}
-                          type="button"
-                          disabled={!cell.summary}
-                          onClick={() => {
-                            if (cell.summary) {
-                              onToggleDate(cell.date);
-                            }
-                          }}
-                          className={`min-h-[6.75rem] rounded-2xl p-2 text-left transition sm:min-h-[8.5rem] xl:min-h-[9.5rem] ${getCalendarCellClass(
-                            cell.summary,
-                            group.responseCount,
-                            busyDateSet.has(cell.date),
-                          )}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-sm font-semibold">{cell.day}</span>
-                            {busyDateSet.has(cell.date) ? (
-                              <span className="rounded-full bg-[var(--danger)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                                Busy
-                              </span>
-                            ) : cell.summary?.allAvailable ? (
-                              <span className="rounded-full bg-[var(--success)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                                Open
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {cell.summary ? (
-                            <div className="mt-3 space-y-1 text-[11px] leading-4">
-                              <p>{cell.summary.availableCount} available</p>
-                              <p>{cell.summary.busyCount} busy</p>
-                              {cell.summary.allAvailable ? (
-                                <p className="font-semibold text-[var(--success)]">
-                                  Everyone is free
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <p className="mt-3 text-[11px] leading-4">
-                              Not in group
-                            </p>
-                          )}
-                        </button>
-                      ),
-                    )}
-                  </div>
-                </div>
-              </div>
-            </section>
+function Legend() {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-[18px] gap-y-[9px] border-t border-box-rule pt-[13px] font-mono text-[0.625rem] tracking-[0.06em] uppercase text-box-ink">
+      <span className="inline-flex items-center gap-2">
+        <span>Nobody</span>
+        <span aria-hidden="true" className="flex gap-0.5">
+          {[0, 0.05, 0.13, 0.29].map((alpha) => (
+            <span
+              key={alpha}
+              className="h-[11px] w-[15px] rounded-[2px] border border-cell-shut-line bg-cell-shut"
+              style={{
+                backgroundImage: `linear-gradient(0deg, rgba(255,194,75,${alpha}), rgba(255,194,75,${alpha}))`,
+              }}
+            />
           ))}
-        </div>
-      </form>
+          <span className="h-[11px] w-[15px] rounded-[2px] border border-lamp-soft bg-gradient-to-b from-lamp-soft to-lamp" />
+        </span>
+        <span>Everyone so far</span>
+      </span>
 
-      <div className="panel">
-        <ParticipantsPanel responses={group.responses} editorId={editor?.responseId} />
-      </div>
-    </section>
+      <span className="inline-flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="h-[11px] w-[15px] rounded-[2px] border border-box-rule bg-cell-mine shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)]"
+        />
+        <span>You picked it</span>
+      </span>
+    </div>
   );
 }
 
@@ -627,7 +309,7 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [group, setGroup] = useState(initialGroup);
   const [viewMode, setViewMode] = useState("calendar");
   const [name, setName] = useState("");
-  const [busyDates, setBusyDates] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
   const [editor, setEditor] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
@@ -660,7 +342,7 @@ export default function GroupPage({ groupId, initialGroup }) {
 
     setEditor(savedEditor);
     setName(savedResponse.name);
-    setBusyDates(savedResponse.busyDates);
+    setAvailableDates(savedResponse.availableDates);
     setHasLoadedSavedResponse(true);
   }, [groupId, group.responses, hasLoadedSavedResponse]);
 
@@ -673,7 +355,7 @@ export default function GroupPage({ groupId, initialGroup }) {
   }, []);
 
   function toggleDate(date) {
-    setBusyDates((currentDates) => {
+    setAvailableDates((currentDates) => {
       if (currentDates.includes(date)) {
         return currentDates.filter((currentDate) => currentDate !== date);
       }
@@ -708,9 +390,11 @@ export default function GroupPage({ groupId, initialGroup }) {
         headers: {
           "Content-Type": "application/json",
         },
+        // availableDates only — validateResponseInput prefers busyDates when
+        // both are present, so the two must never be sent together.
         body: JSON.stringify({
           name,
-          busyDates,
+          availableDates,
           responseId: editor?.responseId,
           editToken: editor?.editToken,
         }),
@@ -730,7 +414,7 @@ export default function GroupPage({ groupId, initialGroup }) {
       setGroup(payload.group);
       setEditor(payload.editor);
       writeSavedEditor(groupId, payload.editor);
-      setFeedback(editor ? "Busy dates updated." : "Busy dates saved.");
+      setFeedback(editor ? "Dates updated." : "Dates saved.");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -738,151 +422,232 @@ export default function GroupPage({ groupId, initialGroup }) {
     }
   }
 
-  const commonDatesMessage =
-    group.responseCount === 0
-      ? "Waiting for the first response."
-      : group.commonDates.length > 0
-        ? null
-        : "No date works for everyone yet.";
   const calendarMonths = buildCalendarMonths(group.dateSummaries);
+  const pickedSet = new Set(availableDates);
+  const isPicked = (date) => pickedSet.has(date);
+
+  let answer;
+
+  if (group.responseCount === 0) {
+    answer = "No replies yet. Tap the dates you can make.";
+  } else if (group.responseCount === 1) {
+    answer = "Waiting for the first reply from anyone else.";
+  } else if (group.commonDates.length === 0) {
+    answer = "No date works for everyone yet.";
+  } else {
+    answer = null;
+  }
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-6 sm:px-6 lg:px-10">
+      <div className="flex flex-col gap-3.5 py-5 lg:flex-row lg:items-end lg:justify-between lg:gap-6 lg:py-8">
+        <div className="min-w-0">
           <Link
             href="/"
-            className="inline-flex items-center text-sm font-semibold text-[var(--accent)] transition hover:text-[var(--accent-strong)]"
+            className="label inline-flex min-h-11 items-center underline decoration-rule underline-offset-[3px] transition-colors hover:text-ink"
           >
             Create another group
           </Link>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-              Shared availability
-            </p>
-            <h1 className="text-3xl font-extrabold tracking-tight text-[var(--text)] sm:text-4xl">
-              {group.name}
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-[var(--muted)]">
-              Share this page with your group. Everyone can submit a display
-              name and mark the dates they are busy.
-            </p>
-          </div>
+          <h1 className="font-display text-[clamp(1.85rem,8vw,2.9rem)] leading-[1.02] font-extrabold tracking-[-0.035em] text-balance">
+            {group.name}
+          </h1>
+          <p className="mt-1 font-mono text-xs tabular-nums text-ink-2">
+            <b className="font-medium text-ink">{group.responseCount}</b>{" "}
+            {group.responseCount === 1 ? "reply" : "replies"}
+            {" · "}
+            <b className="font-medium text-ink">{group.dates.length}</b> dates
+          </p>
         </div>
 
-        <div className="panel flex w-full max-w-xl flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              readOnly
-              value={shareUrl}
-              aria-label="Group link"
-              onFocus={(event) => event.target.select()}
-              className="input-field min-w-0 flex-1"
-            />
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="button-secondary whitespace-nowrap"
+        {/* Not disabled while shareUrl fills in on hydration — that renders the
+            one obvious action greyed out on load. handleCopyLink guards. */}
+        <button
+          type="button"
+          onClick={handleCopyLink}
+          className="btn-quiet shrink-0 self-start"
+        >
+          <CopyIcon />
+          {copyState === "copied"
+            ? "Link copied"
+            : copyState === "error"
+              ? "Copy failed"
+              : "Copy link"}
+        </button>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] lg:items-start lg:gap-7 [&>*]:min-w-0">
+        <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5">
+          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
+            <p className="label text-box-ink">The stack</p>
+
+            <div
+              role="group"
+              aria-label="View"
+              className="inline-flex gap-[3px] rounded-md border border-box-rule bg-[#0d130f] p-[3px]"
             >
-              {copyState === "copied"
-                ? "Copied"
-                : copyState === "error"
-                  ? "Copy failed"
-                  : "Copy link"}
-            </button>
-          </div>
-          <p className="text-sm leading-6 text-[var(--muted)]">
-            Responses from this browser stay editable later on this device. No
-            account required.
-          </p>
-        </div>
-      </div>
-
-      <div className="panel flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            View
-          </p>
-          <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-            Switch between list and calendar layouts
-          </h2>
-          <p className="text-sm leading-6 text-[var(--muted)]">
-            Both views show the same availability, whichever you prefer.
-          </p>
-        </div>
-
-        <div className="inline-flex w-full rounded-full border border-[var(--line)] bg-white p-1 sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:flex-none ${
-              viewMode === "list"
-                ? "bg-[var(--accent)] text-white shadow-sm"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            List view
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("calendar")}
-            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:flex-none ${
-              viewMode === "calendar"
-                ? "bg-[var(--accent)] text-white shadow-sm"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Calendar view
-          </button>
-        </div>
-      </div>
-
-      {viewMode === "calendar" ? (
-        <CalendarWorkspace
-          group={group}
-          calendarMonths={calendarMonths}
-          commonDatesMessage={commonDatesMessage}
-          busyDates={busyDates}
-          name={name}
-          onNameChange={setName}
-          onToggleDate={toggleDate}
-          onSubmit={handleSubmit}
-          isSaving={isSaving}
-          editor={editor}
-          feedback={feedback}
-          error={error}
-        />
-      ) : (
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
-            <CommonDatesPanel
-              commonDates={group.commonDates}
-              commonDatesMessage={commonDatesMessage}
-              responseCount={group.responseCount}
-            />
-            <ListBreakdownPanel group={group} />
-            <div className="panel">
-              <ParticipantsPanel
-                responses={group.responses}
-                editorId={editor?.responseId}
-              />
+              <ViewButton
+                selected={viewMode === "calendar"}
+                onClick={() => setViewMode("calendar")}
+              >
+                Calendar
+              </ViewButton>
+              <ViewButton
+                selected={viewMode === "list"}
+                onClick={() => setViewMode("list")}
+              >
+                List
+              </ViewButton>
             </div>
           </div>
 
-          <ListBusyPicker
-            group={group}
-            busyDates={busyDates}
-            name={name}
-            onNameChange={setName}
-            onToggleDate={toggleDate}
-            onSubmit={handleSubmit}
-            isSaving={isSaving}
-            editor={editor}
-            feedback={feedback}
-            error={error}
-          />
+          <p
+            aria-live="polite"
+            className="mb-4 border-b border-box-rule pb-3.5 font-mono text-[0.8125rem] tabular-nums text-box-ink"
+          >
+            {answer ?? (
+              <>
+                <span className="font-medium text-lamp-soft">
+                  {joinLabels(
+                    group.commonDates.map((date) => formatShortLabel(date.date)),
+                  )}
+                </span>
+                {group.commonDates.length === 1 ? " works" : " work"} for all{" "}
+                {group.responseCount} who have replied.
+              </>
+            )}
+          </p>
+
+          {viewMode === "calendar" ? (
+            <CalendarGrid
+              months={calendarMonths}
+              responseCount={group.responseCount}
+              isPicked={isPicked}
+              onToggle={toggleDate}
+            />
+          ) : (
+            <DateList
+              dateSummaries={group.dateSummaries}
+              responseCount={group.responseCount}
+              isPicked={isPicked}
+              onToggle={toggleDate}
+            />
+          )}
+
+          <Legend />
         </section>
-      )}
+
+        <form
+          onSubmit={handleSubmit}
+          className="card flex flex-col gap-[15px] px-4 py-[18px] sm:px-5 lg:sticky lg:top-7"
+        >
+          <div className="flex flex-col gap-[7px]">
+            <label htmlFor="your-name" className="label">
+              Your name
+            </label>
+            <input
+              id="your-name"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Your name"
+              className="input-field"
+              maxLength={50}
+            />
+          </div>
+
+          <p className="min-h-[1.4em] font-mono text-xs text-ink-2">
+            {availableDates.length === 0
+              ? "Tap the dates you can make."
+              : `You can make ${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"}.`}
+          </p>
+
+          {error ? <p className="notice notice-error">{error}</p> : null}
+
+          <button type="submit" disabled={isSaving} className="btn w-full justify-between">
+            {isSaving ? "Saving..." : editor ? "Update your dates" : "Save your dates"}
+            <Arrow />
+          </button>
+
+          <p aria-live="polite" className="min-h-[1.4em] font-mono text-xs text-ink">
+            {feedback}
+          </p>
+        </form>
+      </div>
+
+      <section className="mt-6 flex flex-col gap-2.5 border-t border-rule pt-[18px]">
+        <p className="label">Replied so far</p>
+        <ul className="flex list-none flex-wrap gap-1.5 p-0">
+          {group.responses.length === 0 ? (
+            <li className="rounded-full border border-dashed border-rule px-[11px] py-1.5 font-mono text-xs text-ink-2">
+              Nobody yet
+            </li>
+          ) : (
+            group.responses.map((response) => (
+              <li
+                key={response.id}
+                className={`rounded-full border px-[11px] py-1.5 font-mono text-xs ${
+                  editor?.responseId === response.id
+                    ? "border-ink bg-surface text-ink"
+                    : "border-rule bg-surface text-ink-2"
+                }`}
+              >
+                {response.name}
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
     </main>
+  );
+}
+
+function ViewButton({ selected, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`min-h-11 rounded-[4px] border-0 px-[13px] font-mono text-[0.6875rem] tracking-[0.08em] uppercase transition-colors ${
+        selected ? "bg-lamp-soft text-box" : "bg-transparent text-box-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect
+        x="5.5"
+        y="5.5"
+        width="9"
+        height="9"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function Arrow() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M3 9h11M9.5 4.5 14 9l-4.5 4.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

@@ -1,11 +1,35 @@
 import "./app.css";
 
 import Link from "next/link";
+import { Bricolage_Grotesque, DM_Mono, Public_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
 import BrandMark from "@/components/brand-mark";
 import SiteFooter from "@/components/site-footer";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+
+// Self-hosted through next/font so there is no render-blocking request to
+// fonts.googleapis.com and no swap-in shift. Most of the traffic is mobile.
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const body = Public_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const mono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -71,28 +95,25 @@ const jsonLd = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${mono.variable}`}
+    >
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body>
-        <header className="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6 lg:px-8">
+        <header className="mx-auto w-full max-w-6xl px-5 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 transition hover:opacity-80"
+            className="-my-2.5 inline-flex items-center gap-2.5 py-2.5 transition hover:opacity-70"
             aria-label={`${SITE_NAME} home`}
           >
-            <BrandMark size={38} />
-            <span className="text-lg font-extrabold tracking-tight text-[var(--text)]">
+            <BrandMark size={26} />
+            <span className="font-display text-[1.0625rem] font-bold tracking-[-0.02em] text-ink">
               {SITE_NAME}
             </span>
           </Link>

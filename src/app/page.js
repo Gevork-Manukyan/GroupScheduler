@@ -1,57 +1,34 @@
 import CreateGroupForm from "@/components/create-group-form";
+import StackDemo from "@/components/stack-demo";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div className="space-y-6">
-          <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)] shadow-sm backdrop-blur">
-            Minimal group scheduling
-          </div>
+    <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-7 pb-4 sm:px-6 lg:px-10 lg:pt-14">
+      <div className="grid gap-7 lg:grid-cols-[1.08fr_0.92fr] lg:items-start lg:gap-12 [&>*]:min-w-0">
+        <div className="flex flex-col gap-4 lg:gap-6">
+          <h1 className="font-display text-[clamp(2.05rem,9.4vw,4.25rem)] leading-[0.98] font-extrabold tracking-[-0.038em] text-balance">
+            <span className="block text-ink-2">
+              The group chat won&rsquo;t pick a date.
+            </span>
+            <span className="block">Send one link instead.</span>
+          </h1>
 
-          <div className="space-y-4">
-            <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight text-[var(--text)] sm:text-5xl">
-              Choose a range or exact dates, share one link, and find the overlap.
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-              Create a group, choose either an overall date range or exact
-              dates, and let everyone mark the days they are busy. No accounts,
-              no passwords, and no extra profile data.
-            </p>
-          </div>
+          <p className="max-w-[46ch] text-base text-pretty text-ink-2">
+            Each person taps the days they can make. The days everyone picked
+            are your answer.
+          </p>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="panel space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                1. Create
-              </p>
-              <p className="text-sm leading-6 text-[var(--text)]">
-                Name the group and choose either a date range or exact dates.
-              </p>
-            </div>
-            <div className="panel space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                2. Share
-              </p>
-              <p className="text-sm leading-6 text-[var(--text)]">
-                Send the group link anywhere you want. People only need a
-                display name.
-              </p>
-            </div>
-            <div className="panel space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                3. Compare
-              </p>
-              <p className="text-sm leading-6 text-[var(--text)]">
-                The shared page shows which dates stay available after everyone
-                marks their busy days.
-              </p>
-            </div>
-          </div>
+          <StackDemo />
         </div>
 
         <CreateGroupForm />
-      </section>
+      </div>
+
+      <div className="mt-9 flex flex-wrap gap-x-6 gap-y-2 border-t border-rule pt-4 lg:mt-14">
+        <p className="label">No accounts</p>
+        <p className="label">No email required</p>
+        <p className="label">Free</p>
+      </div>
     </main>
   );
 }

@@ -90,187 +90,184 @@ export default function CreateGroupForm() {
   }
 
   return (
-    <section className="panel-strong">
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-          Create a group
-        </p>
-        <h2 className="text-2xl font-bold tracking-tight text-[var(--text)]">
-          Choose whether your group should use a range or exact dates.
-        </h2>
+    <form
+      onSubmit={handleSubmit}
+      className="card flex flex-col gap-[18px] px-4 py-5 sm:px-6 sm:py-6 lg:sticky lg:top-7"
+    >
+      <div className="flex flex-col gap-[7px]">
+        <label htmlFor="group-name" className="label">
+          Group name
+        </label>
+        <input
+          id="group-name"
+          type="text"
+          value={groupName}
+          onChange={(event) => setGroupName(event.target.value)}
+          placeholder="Dinner with the group"
+          className="input-field"
+          maxLength={80}
+        />
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-[var(--text)]">
-            Group name
-          </span>
-          <input
-            type="text"
-            value={groupName}
-            onChange={(event) => setGroupName(event.target.value)}
-            placeholder="Friday dinner, project kickoff, family trip..."
-            className="input-field"
-            maxLength={80}
+      <div className="flex flex-col gap-[7px]">
+        <span id="date-setup" className="label">
+          Which days can people choose from
+        </span>
+
+        <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="date-setup">
+          <ModeButton
+            selected={selectionMode === "range"}
+            onClick={() => setSelectionMode("range")}
+            title="A date range"
+            detail="All days in between"
           />
-        </label>
+          <ModeButton
+            selected={selectionMode === "specific"}
+            onClick={() => setSelectionMode("specific")}
+            title="Exact dates"
+            detail="Only the days you pick"
+          />
+        </div>
+      </div>
 
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <span className="text-sm font-semibold text-[var(--text)]">
-              Date setup
-            </span>
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              Pick the simplest option for your group.
-            </p>
+      {selectionMode === "range" ? (
+        <>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="flex flex-col gap-[7px]">
+              <label htmlFor="start-date" className="label">
+                From
+              </label>
+              <input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="input-field font-mono text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-[7px]">
+              <label htmlFor="end-date" className="label">
+                To
+              </label>
+              <input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="input-field font-mono text-sm"
+              />
+            </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setSelectionMode("range")}
-              className={`rounded-3xl border px-4 py-4 text-left transition ${
-                selectionMode === "range"
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                  : "border-[var(--line)] bg-white"
-              }`}
-            >
-              <p className="text-sm font-semibold text-[var(--text)]">
-                Date range
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Let participants mark busy days anywhere between a start and end
-                date.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectionMode("specific")}
-              className={`rounded-3xl border px-4 py-4 text-left transition ${
-                selectionMode === "specific"
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                  : "border-[var(--line)] bg-white"
-              }`}
-            >
-              <p className="text-sm font-semibold text-[var(--text)]">
-                Specific dates
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Only include the exact dates people should choose between.
-              </p>
-            </button>
-          </div>
-
-          {selectionMode === "range" ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[var(--text)]">
-                    Start date
-                  </span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(event) => setStartDate(event.target.value)}
-                    className="input-field min-w-0 flex-1"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[var(--text)]">
-                    End date
-                  </span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(event) => setEndDate(event.target.value)}
-                    className="input-field min-w-0 flex-1"
-                  />
-                </label>
-              </div>
-
-              {rangeError ? (
-                <div className="rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-5 text-sm leading-6 text-[var(--danger)]">
-                  {rangeError}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--panel-soft)] px-4 py-5 text-sm leading-6 text-[var(--muted)]">
-                  Participants will be able to mark busy days anywhere in this
-                  range. Keep the range at {MAX_GROUP_RANGE_DAYS} days or fewer
-                  so the shared page stays easy to use.
-                </div>
-              )}
-            </>
+          {rangeError ? (
+            <p className="notice notice-error">{rangeError}</p>
           ) : (
-            <>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  type="date"
-                  value={specificDateInput}
-                  onChange={(event) => setSpecificDateInput(event.target.value)}
-                  aria-label="Add a specific date"
-                  className="input-field min-w-0 flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={addSpecificDate}
-                  className="button-secondary whitespace-nowrap"
-                >
-                  Add date
-                </button>
-              </div>
-
-              {specificDates.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {specificDates.map((date) => (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => removeSpecificDate(date)}
-                      className="chip"
-                    >
-                      <span>{formatDateLabel(date)}</span>
-                      <span className="text-[var(--muted)]">Remove</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--panel-soft)] px-4 py-5 text-sm leading-6 text-[var(--muted)]">
-                  Add the exact dates people should vote on.
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--panel-soft)] px-4 py-5 text-sm leading-6 text-[var(--muted)]">
-                You can include up to {MAX_GROUP_RANGE_DAYS} specific dates.
-              </div>
-            </>
+            <p className="notice notice-quiet">
+              Everyone picks from the days in this range. Keep it to{" "}
+              {MAX_GROUP_RANGE_DAYS} days or fewer so the shared page stays easy
+              to use.
+            </p>
           )}
-        </div>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            <input
+              type="date"
+              value={specificDateInput}
+              onChange={(event) => setSpecificDateInput(event.target.value)}
+              aria-label="Add a specific date"
+              className="input-field min-w-0 flex-1 font-mono text-sm"
+            />
+            <button
+              type="button"
+              onClick={addSpecificDate}
+              className="btn-quiet shrink-0"
+            >
+              Add date
+            </button>
+          </div>
 
-        {error ? (
-          <p className="rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        ) : null}
+          {specificDates.length > 0 ? (
+            <ul className="flex list-none flex-wrap gap-2 p-0">
+              {specificDates.map((date) => (
+                <li key={date}>
+                  <button
+                    type="button"
+                    onClick={() => removeSpecificDate(date)}
+                    aria-label={`Remove ${formatDateLabel(date)}`}
+                    className="flex min-h-11 items-center gap-2.5 rounded-md border border-rule bg-paper px-3 font-mono text-xs text-ink transition-colors hover:border-ink"
+                  >
+                    <span>{formatDateLabel(date)}</span>
+                    <span aria-hidden="true" className="text-ink-2">
+                      &times;
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="notice notice-quiet">
+              Add the exact dates people should choose between. Up to{" "}
+              {MAX_GROUP_RANGE_DAYS}.
+            </p>
+          )}
+        </>
+      )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm leading-6 text-[var(--muted)]">
-            The next page gives you a shareable link you can send to your
-            group.
-          </p>
-          <button
-            type="submit"
-            disabled={
-              isSubmitting ||
-              (selectionMode === "range"
-                ? Boolean(rangeError)
-                : specificDates.length === 0)
-            }
-            className="button-primary"
-          >
-            {isSubmitting ? "Creating group..." : "Create group"}
-          </button>
-        </div>
-      </form>
-    </section>
+      {error ? <p className="notice notice-error">{error}</p> : null}
+
+      <button
+        type="submit"
+        disabled={
+          isSubmitting ||
+          (selectionMode === "range"
+            ? Boolean(rangeError)
+            : specificDates.length === 0)
+        }
+        className="btn w-full justify-between"
+      >
+        {isSubmitting ? "Creating group..." : "Create group"}
+        <Arrow />
+      </button>
+
+      <p className="text-[0.8125rem] text-ink-2">
+        You&rsquo;ll get a link to share. Nobody needs an account.
+      </p>
+    </form>
+  );
+}
+
+function ModeButton({ selected, onClick, title, detail }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`min-h-12 rounded-md border px-3 py-2.5 text-left transition-colors ${
+        selected
+          ? "border-ink bg-surface shadow-[inset_0_0_0_1px_var(--color-ink)]"
+          : "border-rule bg-paper"
+      }`}
+    >
+      <span className="block text-[0.9375rem] font-semibold text-ink">
+        {title}
+      </span>
+      <span className="block text-xs leading-snug text-ink-2">{detail}</span>
+    </button>
+  );
+}
+
+function Arrow() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M3 9h11M9.5 4.5 14 9l-4.5 4.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
