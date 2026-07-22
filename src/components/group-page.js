@@ -126,6 +126,35 @@ function formatMonthLabel(year, monthIndex) {
 // "Sat Jul 25", deliberately without the comma Intl puts after the weekday —
 // these get joined into comma-separated lists, and a comma inside each item
 // makes the list unreadable.
+// "Jul 21 – 27" within a month, "Jul 28 – Aug 3" across one.
+function formatRange(dates) {
+  if (dates.length === 0) {
+    return "";
+  }
+
+  const monthDay = (value) => {
+    const { year, monthIndex, day } = getDateParts(value);
+
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+    }).format(new Date(year, monthIndex, day));
+  };
+
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+
+  if (first === last) {
+    return monthDay(first);
+  }
+
+  const sameMonth =
+    getDateParts(first).monthIndex === getDateParts(last).monthIndex &&
+    getDateParts(first).year === getDateParts(last).year;
+
+  return `${monthDay(first)} – ${sameMonth ? getDateParts(last).day : monthDay(last)}`;
+}
+
 function formatShortLabel(value) {
   const { year, monthIndex, day } = getDateParts(value);
   const date = new Date(year, monthIndex, day);
@@ -384,6 +413,9 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedSavedResponse, setHasLoadedSavedResponse] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  // Set once you try to save without a name. From then on the message follows
+  // the field: it clears as you type and comes back if you empty it again.
+  const [nameAsked, setNameAsked] = useState(false);
   const nameInputRef = useRef(null);
 
   useEffect(() => {
@@ -456,17 +488,18 @@ export default function GroupPage({ groupId, initialGroup }) {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    // Saving without a name always fails server-side, and the error lands in
-    // the reply card which may be off-screen. Send them to the field instead.
+    // Saving without a name always fails server-side, so ask here instead of
+    // making a round trip to be told the same thing.
     if (!name.trim()) {
       const field = nameInputRef.current;
+
+      setNameAsked(true);
 
       if (field) {
         field.scrollIntoView({ block: "center", behavior: "smooth" });
         field.focus({ preventScroll: true });
       }
 
-      setError("Enter your name, then save.");
       return;
     }
 
@@ -505,7 +538,14 @@ export default function GroupPage({ groupId, initialGroup }) {
       setEditor(payload.editor);
       writeSavedEditor(groupId, payload.editor);
       clearDraft(groupId);
-      setFeedback(editor ? "Dates updated." : "Dates saved.");
+      setNameAsked(false);
+      setFeedback(
+        availableDates.length === 0
+          ? "Saved. The group can see you can't make any of these."
+          : editor
+            ? "Dates updated."
+            : "Dates saved.",
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -568,6 +608,13 @@ export default function GroupPage({ groupId, initialGroup }) {
   */
   const showSaveStrip =
     unsaved && (availableDates.length > 0 || Boolean(savedResponse));
+
+  const nameMissing = nameAsked && !name.trim();
+
+  // Only the gap the strip cannot cover: nothing picked and nothing on record.
+  // Once there is a saved response, clearing every date is an ordinary edit
+  // and goes through the strip like any other change.
+  const canDeclareNone = availableDates.length === 0 && !savedResponse;
 
   // Keep the draft in step with the selection, but only once the restore pass
   // has run — otherwise the initial empty state would overwrite a good draft.
@@ -664,9 +711,18 @@ export default function GroupPage({ groupId, initialGroup }) {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Your name"
-            className="input-field"
+            className={`input-field ${nameMissing ? "border-flag" : ""}`}
             maxLength={50}
+            aria-invalid={nameMissing || undefined}
+            aria-describedby={nameMissing ? "name-error" : undefined}
           />
+
+          {nameMissing ? (
+            <p id="name-error" className="font-mono text-xs text-flag">
+              Enter your name, then save.
+            </p>
+          ) : null}
+
           {feedback ? (
             <p aria-live="polite" className="font-mono text-xs text-ink">
               {feedback}
@@ -720,7 +776,12 @@ export default function GroupPage({ groupId, initialGroup }) {
           ) : null}
 
           <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
-            <p className="label text-box-ink">The stack</p>
+            {/* The window these dates cover — the meta line only gives a count,
+                and a long range spans months you would otherwise have to
+                scroll the calendar to discover. */}
+            <p className="font-mono text-[0.6875rem] tracking-[0.06em] uppercase text-box-ink">
+              {formatRange(group.dates)}
+            </p>
 
             <div
               role="group"
@@ -774,7 +835,25 @@ export default function GroupPage({ groupId, initialGroup }) {
           <Legend />
         </section>
 
-        <section className="flex flex-col gap-2.5 border-t border-rule pt-[18px] lg:col-start-2 lg:row-start-2">
+        <div className="flex flex-col gap-5 lg:col-start-2 lg:row-start-2">
+          {/*
+            Someone who can't make a single date still has something to tell
+            the group, and saving nothing is indistinguishable from not having
+            finished. It sits after the calendar on purpose: it is the answer
+            you reach once you have looked, not the first button you meet.
+          */}
+          {canDeclareNone ? (
+            <button
+              type="submit"
+              form="reply-form"
+              disabled={isSaving}
+              className="btn-quiet self-start"
+            >
+              {isSaving ? "Saving..." : "I can't make any of these"}
+            </button>
+          ) : null}
+
+          <section className="flex flex-col gap-2.5 border-t border-rule pt-[18px]">
         <p className="label">Replied so far</p>
         <ul className="flex list-none flex-wrap gap-1.5 p-0">
           {group.responses.length === 0 ? (
@@ -793,10 +872,11 @@ export default function GroupPage({ groupId, initialGroup }) {
               >
                 {response.name}
               </li>
-            ))
-          )}
-        </ul>
-        </section>
+              ))
+            )}
+          </ul>
+          </section>
+        </div>
       </div>
     </main>
   );
