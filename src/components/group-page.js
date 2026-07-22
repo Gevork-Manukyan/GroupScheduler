@@ -560,6 +560,15 @@ export default function GroupPage({ groupId, initialGroup }) {
     savedList.some((date, index) => date !== availableDates[index]) ||
     (savedResponse ? name !== savedResponse.name : name.trim().length > 0);
 
+  /*
+    Typing a name is a change, but on its own there is nothing worth sending —
+    and now that the name field comes first, offering Save at that point would
+    let someone file an empty answer before they reach the calendar. A
+    returning editor clearing every date is different: that is a real edit.
+  */
+  const showSaveStrip =
+    unsaved && (availableDates.length > 0 || Boolean(savedResponse));
+
   // Keep the draft in step with the selection, but only once the restore pass
   // has run — otherwise the initial empty state would overwrite a good draft.
   useEffect(() => {
@@ -631,12 +640,47 @@ export default function GroupPage({ groupId, initialGroup }) {
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] lg:items-start lg:gap-7 [&>*]:min-w-0">
-        <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5">
+      {/*
+        Three placed items rather than two columns of stacked content: on a
+        phone the DOM order is name, then the stack, then the roster, which is
+        the order you actually work in. On desktop the stack takes the left
+        column and the two small pieces sit beside it.
+      */}
+      {/* rows: auto/1fr so the row-spanning stack cannot stretch row one and
+          push the roster away from the name field it sits under. */}
+      <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-7 lg:gap-y-6 [&>*]:min-w-0">
+        <form
+          id="reply-form"
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-[7px] lg:col-start-2 lg:row-start-1"
+        >
+          <label htmlFor="your-name" className="label">
+            Your name
+          </label>
+          <input
+            id="your-name"
+            ref={nameInputRef}
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Your name"
+            className="input-field"
+            maxLength={50}
+          />
+          {feedback ? (
+            <p aria-live="polite" className="font-mono text-xs text-ink">
+              {feedback}
+            </p>
+          ) : (
+            <p aria-live="polite" className="sr-only" />
+          )}
+        </form>
+
+        <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           {/* Pinned to the top of the panel: this is where you are looking
               while picking, and it carries the action so the reply card does
               not have to be on screen. */}
-          {unsaved ? (
+          {showSaveStrip ? (
             <div
               data-unsaved-strip
               className="sticky top-0 z-20 -mx-3.5 mb-3.5 border-b border-lamp-soft/40 bg-box px-3.5 py-2.5 sm:-mx-5 sm:px-5"
@@ -730,45 +774,7 @@ export default function GroupPage({ groupId, initialGroup }) {
           <Legend />
         </section>
 
-        <form
-          id="reply-form"
-          onSubmit={handleSubmit}
-          className={`card flex flex-col gap-[15px] px-4 py-[18px] sm:px-5 lg:sticky lg:top-7 ${
-            unsaved ? "border-lamp shadow-[0_0_0_1px_var(--color-lamp)]" : ""
-          }`}
-        >
-          <div className="flex flex-col gap-[7px]">
-            <label htmlFor="your-name" className="label">
-              Your name
-            </label>
-            <input
-              id="your-name"
-              ref={nameInputRef}
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Your name"
-              className="input-field"
-              maxLength={50}
-            />
-          </div>
-
-          {/* The save action lives in the pinned strip, which appears exactly
-              when there is something to save. A second button here would be
-              the same action under a second name. */}
-          <p className="min-h-[1.4em] font-mono text-xs text-ink-2">
-            {availableDates.length === 0
-              ? "Tap the dates you can make."
-              : `You can make ${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"}.`}
-          </p>
-
-          <p aria-live="polite" className="min-h-[1.4em] font-mono text-xs text-ink">
-            {feedback}
-          </p>
-        </form>
-      </div>
-
-      <section className="mt-6 flex flex-col gap-2.5 border-t border-rule pt-[18px]">
+        <section className="flex flex-col gap-2.5 border-t border-rule pt-[18px] lg:col-start-2 lg:row-start-2">
         <p className="label">Replied so far</p>
         <ul className="flex list-none flex-wrap gap-1.5 p-0">
           {group.responses.length === 0 ? (
@@ -790,7 +796,8 @@ export default function GroupPage({ groupId, initialGroup }) {
             ))
           )}
         </ul>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
