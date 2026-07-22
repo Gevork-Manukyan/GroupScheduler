@@ -324,6 +324,16 @@ function CalendarGrid({ months, total, liveByDate, onToggle }) {
   );
 }
 
+/*
+  One signal per channel, the same grammar the calendar uses: the ring means
+  you picked it, amber means the group agrees.
+
+  Previously "everyone can make it" was a pale border while "you picked it"
+  was a paler background — two unrelated looks for two states — and because
+  the first was tested first it swallowed the second, so a date you picked
+  that everyone can make carried no sign you had picked it. Three of your own
+  picks could render two different ways, which is what made it unreadable.
+*/
 function DateList({ dateSummaries, total, liveByDate, onToggle }) {
   return (
     <div className="flex flex-col gap-1">
@@ -338,16 +348,14 @@ function DateList({ dateSummaries, total, liveByDate, onToggle }) {
             onClick={() => onToggle(summary.date)}
             aria-pressed={live.picked}
             aria-label={`${formatShortLabel(summary.date)} — ${live.count} of ${total} can make it${live.picked ? ", including you" : ""}`}
-            className={`grid min-h-[46px] w-full grid-cols-[5.25rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-colors hover:border-lamp-soft ${
-              live.all
-                ? "border-lamp-soft/55 bg-cell-shut"
-                : live.picked
-                  ? "border-box-rule bg-cell-mine"
-                  : "border-cell-shut-line bg-cell-shut"
+            className={`grid min-h-[46px] w-full grid-cols-[5.25rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-[background-color,border-color,box-shadow] hover:border-box-ink ${
+              live.picked
+                ? "border-box-rule bg-cell-mine shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)]"
+                : "border-cell-shut-line bg-cell-shut"
             }`}
           >
             <span
-              className={`whitespace-nowrap ${live.picked ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
+              className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
             >
               {formatShortLabel(summary.date)}
             </span>
@@ -556,7 +564,7 @@ export default function GroupPage({ groupId, initialGroup }) {
         id: toastId.current,
         text:
           availableDates.length === 0
-            ? "Saved. You can't make any of these."
+            ? "Saved. You can't make any of these days."
             : editor
               ? "Dates updated."
               : "Dates saved.",
