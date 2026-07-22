@@ -407,7 +407,10 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [name, setName] = useState("");
   const [availableDates, setAvailableDates] = useState([]);
   const [editor, setEditor] = useState(null);
-  const [feedback, setFeedback] = useState("");
+  // { text, seq } rather than a bare string: saving twice with the same result
+  // has to restart the dismiss timer, and identical strings would not.
+  const [feedback, setFeedback] = useState(null);
+  const feedbackSeq = useRef(0);
   const [error, setError] = useState("");
   const [copyState, setCopyState] = useState("idle");
   const [isSaving, setIsSaving] = useState(false);
@@ -461,6 +464,22 @@ export default function GroupPage({ groupId, initialGroup }) {
     setShareUrl(window.location.href);
   }, []);
 
+  /*
+    A confirmation is transient — errors are the ones that should sit there
+    until dealt with. Four seconds clears the longest of these messages with
+    room to spare, and the save confirms itself three other ways anyway: the
+    unsaved strip disappears, the counts move, and your name joins the roster.
+  */
+  useEffect(() => {
+    if (!feedback) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setFeedback(null), 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
+
   function toggleDate(date) {
     setAvailableDates((currentDates) => {
       if (currentDates.includes(date)) {
@@ -504,7 +523,7 @@ export default function GroupPage({ groupId, initialGroup }) {
     }
 
     setError("");
-    setFeedback("");
+    setFeedback(null);
     setIsSaving(true);
 
     try {
@@ -539,13 +558,16 @@ export default function GroupPage({ groupId, initialGroup }) {
       writeSavedEditor(groupId, payload.editor);
       clearDraft(groupId);
       setNameAsked(false);
-      setFeedback(
-        availableDates.length === 0
-          ? "Saved. The group can see you can't make any of these."
-          : editor
-            ? "Dates updated."
-            : "Dates saved.",
-      );
+      feedbackSeq.current += 1;
+      setFeedback({
+        seq: feedbackSeq.current,
+        text:
+          availableDates.length === 0
+            ? "Saved. The group can see you can't make any of these."
+            : editor
+              ? "Dates updated."
+              : "Dates saved.",
+      });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -725,7 +747,7 @@ export default function GroupPage({ groupId, initialGroup }) {
 
           {feedback ? (
             <p aria-live="polite" className="font-mono text-xs text-ink">
-              {feedback}
+              {feedback.text}
             </p>
           ) : (
             <p aria-live="polite" className="sr-only" />
