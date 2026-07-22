@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 
 import BrandMark from "@/components/brand-mark";
 import SiteFooter from "@/components/site-footer";
+import ThemeToggle, { themeBootScript } from "@/components/theme-toggle";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 // Self-hosted through next/font so there is no render-blocking request to
@@ -104,9 +105,11 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {/* Runs before first paint so a stored theme never flashes. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
-        <header className="mx-auto w-full max-w-6xl px-5 pt-5 sm:px-6 lg:px-10 lg:pt-8">
+        <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <Link
             href="/"
             className="-my-2.5 inline-flex items-center gap-2.5 py-2.5 transition hover:opacity-70"
@@ -117,6 +120,7 @@ export default function RootLayout({ children }) {
               {SITE_NAME}
             </span>
           </Link>
+          <ThemeToggle />
         </header>
         {children}
         <SiteFooter />

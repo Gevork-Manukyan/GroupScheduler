@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -37,6 +37,63 @@ function clearSavedEditor(groupId) {
   }
 
   window.localStorage.removeItem(getStorageKey(groupId));
+}
+
+/*
+  Picks are only on the server once you save, so an accidental refresh used to
+  throw them away. The draft keeps the in-progress selection in this browser
+  until it is saved, and is cleared the moment it matches the server.
+*/
+function getDraftKey(groupId) {
+  return `group-scheduler:${groupId}:draft`;
+}
+
+function readDraft(groupId) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const value = window.localStorage.getItem(getDraftKey(groupId));
+    const draft = value ? JSON.parse(value) : null;
+
+    if (!draft || !Array.isArray(draft.availableDates)) {
+      return null;
+    }
+
+    return {
+      name: typeof draft.name === "string" ? draft.name : "",
+      availableDates: draft.availableDates.filter(
+        (date) => typeof date === "string",
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(groupId, draft) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getDraftKey(groupId), JSON.stringify(draft));
+  } catch {
+    // A full or blocked store should never break the page.
+  }
+}
+
+function clearDraft(groupId) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(getDraftKey(groupId));
+  } catch {
+    // ignore
+  }
 }
 
 function getDateParts(value) {
@@ -145,7 +202,10 @@ function buildCalendarMonths(dateSummaries) {
   curve keeps partial agreement dim and lets a real consensus carry the glow.
 */
 function litAlpha(availableCount, responseCount) {
-  if (!responseCount) {
+  // Below two replies the ramp says nothing — every date is 0/1 or 1/1, so a
+  // single reply would wash its own picks in amber as if the group agreed.
+  // The ring already marks your picks; light waits for someone to agree.
+  if (responseCount < 2) {
     return 0;
   }
 
@@ -324,6 +384,7 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedSavedResponse, setHasLoadedSavedResponse] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const nameInputRef = useRef(null);
 
   useEffect(() => {
     if (hasLoadedSavedResponse) {
@@ -331,27 +392,34 @@ export default function GroupPage({ groupId, initialGroup }) {
     }
 
     const savedEditor = readSavedEditor(groupId);
+    const stored = savedEditor
+      ? group.responses.find((response) => response.id === savedEditor.responseId)
+      : null;
 
-    if (!savedEditor) {
-      setHasLoadedSavedResponse(true);
-      return;
-    }
-
-    const savedResponse = group.responses.find(
-      (response) => response.id === savedEditor.responseId,
-    );
-
-    if (!savedResponse) {
+    if (savedEditor && !stored) {
       clearSavedEditor(groupId);
-      setHasLoadedSavedResponse(true);
-      return;
     }
 
-    setEditor(savedEditor);
-    setName(savedResponse.name);
-    setAvailableDates(savedResponse.availableDates);
+    if (stored) {
+      setEditor(savedEditor);
+      setName(stored.name);
+      setAvailableDates(stored.availableDates);
+    }
+
+    // A draft is unsaved work, so it is newer than whatever the server holds
+    // and takes precedence over the restored response.
+    const draft = readDraft(groupId);
+
+    if (draft) {
+      const allowed = new Set(group.dates);
+      setName(draft.name);
+      setAvailableDates(
+        draft.availableDates.filter((date) => allowed.has(date)).sort(),
+      );
+    }
+
     setHasLoadedSavedResponse(true);
-  }, [groupId, group.responses, hasLoadedSavedResponse]);
+  }, [groupId, group.responses, group.dates, hasLoadedSavedResponse]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -387,6 +455,21 @@ export default function GroupPage({ groupId, initialGroup }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    // Saving without a name always fails server-side, and the error lands in
+    // the reply card which may be off-screen. Send them to the field instead.
+    if (!name.trim()) {
+      const field = nameInputRef.current;
+
+      if (field) {
+        field.scrollIntoView({ block: "center", behavior: "smooth" });
+        field.focus({ preventScroll: true });
+      }
+
+      setError("Enter your name, then save.");
+      return;
+    }
+
     setError("");
     setFeedback("");
     setIsSaving(true);
@@ -421,6 +504,7 @@ export default function GroupPage({ groupId, initialGroup }) {
       setGroup(payload.group);
       setEditor(payload.editor);
       writeSavedEditor(groupId, payload.editor);
+      clearDraft(groupId);
       setFeedback(editor ? "Dates updated." : "Dates saved.");
     } catch (requestError) {
       setError(requestError.message);
@@ -473,7 +557,22 @@ export default function GroupPage({ groupId, initialGroup }) {
   const savedList = [...savedMine].sort();
   const unsaved =
     savedList.length !== availableDates.length ||
-    savedList.some((date, index) => date !== availableDates[index]);
+    savedList.some((date, index) => date !== availableDates[index]) ||
+    (savedResponse ? name !== savedResponse.name : name.trim().length > 0);
+
+  // Keep the draft in step with the selection, but only once the restore pass
+  // has run — otherwise the initial empty state would overwrite a good draft.
+  useEffect(() => {
+    if (!hasLoadedSavedResponse) {
+      return;
+    }
+
+    if (unsaved) {
+      writeDraft(groupId, { name, availableDates });
+    } else {
+      clearDraft(groupId);
+    }
+  }, [groupId, hasLoadedSavedResponse, unsaved, name, availableDates]);
 
   let answer;
 
@@ -534,6 +633,34 @@ export default function GroupPage({ groupId, initialGroup }) {
 
       <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] lg:items-start lg:gap-7 [&>*]:min-w-0">
         <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5">
+          {/* Pinned to the top of the panel: this is where you are looking
+              while picking, and it carries the action so the reply card does
+              not have to be on screen. */}
+          {unsaved ? (
+            <div
+              data-unsaved-strip
+              className="sticky top-0 z-20 -mx-3.5 mb-3.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-lamp-soft/40 bg-box px-3.5 py-2.5 sm:-mx-5 sm:px-5"
+            >
+              <p className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-lamp-soft">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-2 w-2 shrink-0 rounded-full bg-lamp"
+                />
+                {availableDates.length === 0
+                  ? "Nothing picked · not saved"
+                  : `${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"} · not saved`}
+              </p>
+              <button
+                type="submit"
+                form="reply-form"
+                disabled={isSaving}
+                className="min-h-11 shrink-0 rounded-md border border-lamp-soft bg-lamp-soft px-3.5 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : editor ? "Update" : "Save"}
+              </button>
+            </div>
+          ) : null}
+
           <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
             <p className="label text-box-ink">The stack</p>
 
@@ -590,8 +717,11 @@ export default function GroupPage({ groupId, initialGroup }) {
         </section>
 
         <form
+          id="reply-form"
           onSubmit={handleSubmit}
-          className="card flex flex-col gap-[15px] px-4 py-[18px] sm:px-5 lg:sticky lg:top-7"
+          className={`card flex flex-col gap-[15px] px-4 py-[18px] sm:px-5 lg:sticky lg:top-7 ${
+            unsaved ? "border-lamp shadow-[0_0_0_1px_var(--color-lamp)]" : ""
+          }`}
         >
           <div className="flex flex-col gap-[7px]">
             <label htmlFor="your-name" className="label">
@@ -599,6 +729,7 @@ export default function GroupPage({ groupId, initialGroup }) {
             </label>
             <input
               id="your-name"
+              ref={nameInputRef}
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}

@@ -39,6 +39,56 @@
     0 0 18px -2px rgba(255, 194, 75, 0.5), 0 0 44px -10px rgba(255, 194, 75, 0.35);
 }
 
+/*
+  Dark theme. The page ground and paper-side neutrals flip; the stack's own
+  cell colours never do, because the stack is meant to read as one physical
+  object in both themes. Amber keeps its single meaning either way.
+
+  Written as plain overrides of the @theme custom properties, so every
+  Tailwind utility that resolves through var(--color-*) follows along.
+
+  Precedence: system preference first, then an explicit [data-theme] which
+  must win in BOTH directions — a viewer on a dark OS choosing light has to
+  beat the media query.
+*/
+@layer theme {
+  :root {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-paper: #121813;
+      --color-surface: #1b231d;
+      --color-ink: #e7eae1;
+      --color-ink-2: #99a399;
+      --color-rule: #2e382f;
+      --color-flag: #f0907d;
+      --color-flag-soft: #2a1512;
+      --color-box: #0a0e0b;
+      --color-box-rule: #2a342c;
+      --shadow-card:
+        0 1px 0 rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.9);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-paper: #121813;
+    --color-surface: #1b231d;
+    --color-ink: #e7eae1;
+    --color-ink-2: #99a399;
+    --color-rule: #2e382f;
+    --color-flag: #f0907d;
+    --color-flag-soft: #2a1512;
+    --color-box: #0a0e0b;
+    --color-box-rule: #2a342c;
+    --shadow-card:
+      0 1px 0 rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.9);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -229,5 +279,44 @@ label[for],
     border: 1px dashed var(--color-rule);
     background: color-mix(in srgb, var(--color-paper) 60%, var(--color-surface));
     color: var(--color-ink-2);
+  }
+
+  /*
+    Which icon the theme button shows is decided by CSS, not React state. The
+    server cannot know the viewer's preference, so rendering it from state
+    would either mismatch on hydration or flash the wrong icon.
+  */
+  .theme-sun {
+    display: none;
+  }
+
+  .theme-moon {
+    display: block;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .theme-sun {
+      display: block;
+    }
+
+    :root:not([data-theme]) .theme-moon {
+      display: none;
+    }
+  }
+
+  :root[data-theme="dark"] .theme-sun {
+    display: block;
+  }
+
+  :root[data-theme="dark"] .theme-moon {
+    display: none;
+  }
+
+  :root[data-theme="light"] .theme-sun {
+    display: none;
+  }
+
+  :root[data-theme="light"] .theme-moon {
+    display: block;
   }
 }
