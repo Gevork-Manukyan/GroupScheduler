@@ -407,10 +407,8 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [name, setName] = useState("");
   const [availableDates, setAvailableDates] = useState([]);
   const [editor, setEditor] = useState(null);
-  // { text, seq } rather than a bare string: saving twice with the same result
-  // has to restart the dismiss timer, and identical strings would not.
-  const [feedback, setFeedback] = useState(null);
-  const feedbackSeq = useRef(0);
+  // Announced, not displayed — see the live region below.
+  const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [copyState, setCopyState] = useState("idle");
   const [isSaving, setIsSaving] = useState(false);
@@ -464,21 +462,6 @@ export default function GroupPage({ groupId, initialGroup }) {
     setShareUrl(window.location.href);
   }, []);
 
-  /*
-    A confirmation is transient — errors are the ones that should sit there
-    until dealt with. Four seconds clears the longest of these messages with
-    room to spare, and the save confirms itself three other ways anyway: the
-    unsaved strip disappears, the counts move, and your name joins the roster.
-  */
-  useEffect(() => {
-    if (!feedback) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setFeedback(null), 4000);
-
-    return () => window.clearTimeout(timer);
-  }, [feedback]);
 
   function toggleDate(date) {
     setAvailableDates((currentDates) => {
@@ -523,7 +506,7 @@ export default function GroupPage({ groupId, initialGroup }) {
     }
 
     setError("");
-    setFeedback(null);
+    setFeedback("");
     setIsSaving(true);
 
     try {
@@ -558,16 +541,13 @@ export default function GroupPage({ groupId, initialGroup }) {
       writeSavedEditor(groupId, payload.editor);
       clearDraft(groupId);
       setNameAsked(false);
-      feedbackSeq.current += 1;
-      setFeedback({
-        seq: feedbackSeq.current,
-        text:
-          availableDates.length === 0
-            ? "Saved. The group can see you can't make any of these."
-            : editor
-              ? "Dates updated."
-              : "Dates saved.",
-      });
+      setFeedback(
+        availableDates.length === 0
+          ? "Saved. The group can see you can't make any of these."
+          : editor
+            ? "Dates updated."
+            : "Dates saved.",
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -745,13 +725,15 @@ export default function GroupPage({ groupId, initialGroup }) {
             </p>
           ) : null}
 
-          {feedback ? (
-            <p aria-live="polite" className="font-mono text-xs text-ink">
-              {feedback.text}
-            </p>
-          ) : (
-            <p aria-live="polite" className="sr-only" />
-          )}
+          {/*
+            Sighted confirmation is the strip vanishing, which happens at the
+            point of action; a line of text up here was showing outside the
+            reader's gaze and then leaving. A disappearance announces nothing,
+            though, so the message stays for screen readers.
+          */}
+          <p aria-live="polite" className="sr-only">
+            {feedback}
+          </p>
         </form>
 
         <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5 lg:col-start-1 lg:row-start-1 lg:row-span-2">
