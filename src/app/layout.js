@@ -96,8 +96,21 @@ const jsonLd = {
 
 export default function RootLayout({ children }) {
   return (
+    /*
+      The boot script in head stamps data-theme on this element before React
+      hydrates, so the client always has an attribute the server never sent —
+      the server cannot know a preference held in localStorage. React compares
+      the two and warns.
+
+      suppressHydrationWarning is the escape hatch for exactly this, and it
+      covers only this element's own attributes, so a genuine mismatch further
+      down the tree still reports. The alternative — keeping the theme in a
+      cookie so the server can render it — would make every route dynamic just
+      to read it, and the landing page is prerendered.
+    */
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${display.variable} ${body.variable} ${mono.variable}`}
     >
       <head>
