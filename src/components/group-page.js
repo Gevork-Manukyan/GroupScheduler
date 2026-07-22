@@ -763,11 +763,19 @@ export default function GroupPage({ groupId, initialGroup }) {
               data-unsaved-strip
               className="sticky top-0 z-20 -mx-3.5 mb-3.5 border-b border-lamp-soft/40 bg-box px-3.5 py-2.5 sm:-mx-5 sm:px-5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                <p className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-lamp-soft">
+              {/*
+                A two-column grid, not flex-wrap with justify-between: there
+                the button was placed relative to the text's width, so it slid
+                sideways every time the count changed and jumped to its own
+                line at the longer labels. The button column is fixed, the
+                text wraps in what is left, and the row is at least as tall as
+                the button so a wrap cannot move it either.
+              */}
+              <div className="grid grid-cols-[1fr_auto] items-center gap-x-3">
+                <p className="min-w-0 font-mono text-[0.6875rem] leading-snug tracking-[0.08em] uppercase text-lamp-soft">
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 shrink-0 rounded-full bg-lamp"
+                    className="mr-2 inline-block h-2 w-2 rounded-full bg-lamp align-[0.05em]"
                   />
                   {availableDates.length === 0
                     ? "Nothing picked · not saved"
@@ -777,13 +785,9 @@ export default function GroupPage({ groupId, initialGroup }) {
                   type="submit"
                   form="reply-form"
                   disabled={isSaving}
-                  className="min-h-11 shrink-0 rounded-md border border-lamp-soft bg-lamp-soft px-3.5 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
+                  className="min-h-11 w-[8.75rem] rounded-md border border-lamp-soft bg-lamp-soft px-2 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
                 >
-                  {isSaving
-                    ? "Saving..."
-                    : editor
-                      ? "Update your dates"
-                      : "Save your dates"}
+                  {isSaving ? "Saving..." : editor ? "Update dates" : "Save dates"}
                 </button>
               </div>
 
