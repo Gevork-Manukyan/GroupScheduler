@@ -13,10 +13,15 @@
   --color-surface: #fbfcfa;
   --color-ink: #16201b;
   --color-ink-2: #4c564e;
-  /* The primary button is filled with `ink`, which inverts between themes.
-     Hover has to move away from the page ground in whichever direction that
-     is: darker on light, lighter on dark. */
-  --color-ink-hover: #0c130f;
+  /* The primary button is filled with `ink`, which inverts between themes, so
+     hover needs a value per theme. Both darken.
+
+     Lightening the dark theme's button looked right on paper — move away from
+     the page ground — but sat at the top of the luminance range where the eye
+     resolves almost nothing: #e7eae1 to #f5f7f1 is only 4.7 in L*, and reads
+     as no hover at all. Contrast ratio hides this, calling it 1.128 against
+     the light theme's 1.126. Both hovers now sit near 10 in L*. */
+  --color-ink-hover: #030605;
   --color-rule: #c6ccbf;
   --color-lamp: #ffc24b;
   --color-lamp-soft: #ffe7b0;
@@ -67,7 +72,7 @@
       --color-surface: #1b231d;
       --color-ink: #e7eae1;
       --color-ink-2: #99a399;
-      --color-ink-hover: #f5f7f1;
+      --color-ink-hover: #c8cfc4;
       --color-rule: #2e382f;
       --color-flag: #f0907d;
       --color-flag-soft: #2a1512;
@@ -84,7 +89,7 @@
     --color-surface: #1b231d;
     --color-ink: #e7eae1;
     --color-ink-2: #99a399;
-    --color-ink-hover: #f5f7f1;
+    --color-ink-hover: #c8cfc4;
     --color-rule: #2e382f;
     --color-flag: #f0907d;
     --color-flag-soft: #2a1512;

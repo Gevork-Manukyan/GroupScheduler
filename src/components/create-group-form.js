@@ -247,7 +247,7 @@ function ModeButton({ selected, onClick, title, detail }) {
       className={`min-h-12 rounded-md border px-3 py-2.5 text-left transition-colors ${
         selected
           ? "border-ink bg-surface shadow-[inset_0_0_0_1px_var(--color-ink)]"
-          : "border-rule bg-paper"
+          : "border-rule bg-paper hover:border-ink-2"
       }`}
     >
       <span className="block text-[0.9375rem] font-semibold text-ink">

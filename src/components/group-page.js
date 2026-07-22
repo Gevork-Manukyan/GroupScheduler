@@ -780,7 +780,7 @@ export default function GroupPage({ groupId, initialGroup }) {
                   type="submit"
                   form="reply-form"
                   disabled={isSaving}
-                  className="min-h-11 w-[8.75rem] rounded-md border border-lamp-soft bg-lamp-soft px-2 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
+                  className="min-h-11 w-[8.75rem] rounded-md border border-lamp-soft bg-lamp-soft px-2 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-[background-color,border-color,opacity] duration-150 hover:border-lamp hover:bg-lamp disabled:opacity-50"
                 >
                   {isSaving ? "Saving..." : editor ? "Update dates" : "Save dates"}
                 </button>
@@ -910,7 +910,9 @@ function ViewButton({ selected, onClick, children }) {
       onClick={onClick}
       aria-pressed={selected}
       className={`min-h-11 rounded-[4px] border-0 px-[13px] font-mono text-[0.6875rem] tracking-[0.08em] uppercase transition-colors ${
-        selected ? "bg-lamp-soft text-box" : "bg-transparent text-box-ink"
+        selected
+          ? "bg-lamp-soft text-box"
+          : "bg-transparent text-box-ink hover:bg-white/5 hover:text-[#dfe6e0]"
       }`}
     >
       {children}
