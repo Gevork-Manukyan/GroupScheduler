@@ -639,25 +639,39 @@ export default function GroupPage({ groupId, initialGroup }) {
           {unsaved ? (
             <div
               data-unsaved-strip
-              className="sticky top-0 z-20 -mx-3.5 mb-3.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-lamp-soft/40 bg-box px-3.5 py-2.5 sm:-mx-5 sm:px-5"
+              className="sticky top-0 z-20 -mx-3.5 mb-3.5 border-b border-lamp-soft/40 bg-box px-3.5 py-2.5 sm:-mx-5 sm:px-5"
             >
-              <p className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-lamp-soft">
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-2 w-2 shrink-0 rounded-full bg-lamp"
-                />
-                {availableDates.length === 0
-                  ? "Nothing picked · not saved"
-                  : `${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"} · not saved`}
-              </p>
-              <button
-                type="submit"
-                form="reply-form"
-                disabled={isSaving}
-                className="min-h-11 shrink-0 rounded-md border border-lamp-soft bg-lamp-soft px-3.5 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : editor ? "Update" : "Save"}
-              </button>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                <p className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-lamp-soft">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-2 w-2 shrink-0 rounded-full bg-lamp"
+                  />
+                  {availableDates.length === 0
+                    ? "Nothing picked · not saved"
+                    : `${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"} · not saved`}
+                </p>
+                <button
+                  type="submit"
+                  form="reply-form"
+                  disabled={isSaving}
+                  className="min-h-11 shrink-0 rounded-md border border-lamp-soft bg-lamp-soft px-3.5 font-mono text-[0.6875rem] tracking-[0.08em] text-box uppercase transition-opacity disabled:opacity-50"
+                >
+                  {isSaving
+                    ? "Saving..."
+                    : editor
+                      ? "Update your dates"
+                      : "Save your dates"}
+                </button>
+              </div>
+
+              {/* Errors belong where the action is, not in a card that may be
+                  scrolled off. A failed save always leaves the strip showing. */}
+              {error ? (
+                <p className="mt-2 font-mono text-[0.6875rem] text-[#f0907d]">
+                  {error}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -739,18 +753,14 @@ export default function GroupPage({ groupId, initialGroup }) {
             />
           </div>
 
+          {/* The save action lives in the pinned strip, which appears exactly
+              when there is something to save. A second button here would be
+              the same action under a second name. */}
           <p className="min-h-[1.4em] font-mono text-xs text-ink-2">
             {availableDates.length === 0
               ? "Tap the dates you can make."
               : `You can make ${availableDates.length} ${availableDates.length === 1 ? "date" : "dates"}.`}
           </p>
-
-          {error ? <p className="notice notice-error">{error}</p> : null}
-
-          <button type="submit" disabled={isSaving} className="btn w-full justify-between">
-            {isSaving ? "Saving..." : editor ? "Update your dates" : "Save your dates"}
-            <Arrow />
-          </button>
 
           <p aria-live="polite" className="min-h-[1.4em] font-mono text-xs text-ink">
             {feedback}

@@ -13,6 +13,10 @@
   --color-surface: #fbfcfa;
   --color-ink: #16201b;
   --color-ink-2: #4c564e;
+  /* The primary button is filled with `ink`, which inverts between themes.
+     Hover has to move away from the page ground in whichever direction that
+     is: darker on light, lighter on dark. */
+  --color-ink-hover: #0c130f;
   --color-rule: #c6ccbf;
   --color-lamp: #ffc24b;
   --color-lamp-soft: #ffe7b0;
@@ -63,6 +67,7 @@
       --color-surface: #1b231d;
       --color-ink: #e7eae1;
       --color-ink-2: #99a399;
+      --color-ink-hover: #f5f7f1;
       --color-rule: #2e382f;
       --color-flag: #f0907d;
       --color-flag-soft: #2a1512;
@@ -79,6 +84,7 @@
     --color-surface: #1b231d;
     --color-ink: #e7eae1;
     --color-ink-2: #99a399;
+    --color-ink-hover: #f5f7f1;
     --color-rule: #2e382f;
     --color-flag: #f0907d;
     --color-flag-soft: #2a1512;
@@ -204,7 +210,8 @@ label[for],
   }
 
   .btn:hover:not(:disabled) {
-    background: #0c130f;
+    background: var(--color-ink-hover);
+    border-color: var(--color-ink-hover);
   }
 
   .btn:disabled {
