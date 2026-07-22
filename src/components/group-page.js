@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import SaveToast from "@/components/save-toast";
 
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -407,8 +409,16 @@ export default function GroupPage({ groupId, initialGroup }) {
   const [name, setName] = useState("");
   const [availableDates, setAvailableDates] = useState([]);
   const [editor, setEditor] = useState(null);
-  // Announced, not displayed — see the live region below.
-  const [feedback, setFeedback] = useState("");
+  /*
+    { text, id } rather than a string: saving twice running produces the same
+    message, and the toast has to slide in again rather than sit there. A new
+    object each time gives the effect something to react to.
+  */
+  const [toast, setToast] = useState(null);
+  const toastId = useRef(0);
+  // Stable, because SaveToast lists it as an effect dependency — a fresh
+  // arrow each render would restart the dismiss timers forever.
+  const clearToast = useCallback(() => setToast(null), []);
   const [error, setError] = useState("");
   const [copyState, setCopyState] = useState("idle");
   const [isSaving, setIsSaving] = useState(false);
@@ -506,7 +516,7 @@ export default function GroupPage({ groupId, initialGroup }) {
     }
 
     setError("");
-    setFeedback("");
+    setToast(null);
     setIsSaving(true);
 
     try {
@@ -541,13 +551,16 @@ export default function GroupPage({ groupId, initialGroup }) {
       writeSavedEditor(groupId, payload.editor);
       clearDraft(groupId);
       setNameAsked(false);
-      setFeedback(
-        availableDates.length === 0
-          ? "Saved. The group can see you can't make any of these."
-          : editor
-            ? "Dates updated."
-            : "Dates saved.",
-      );
+      toastId.current += 1;
+      setToast({
+        id: toastId.current,
+        text:
+          availableDates.length === 0
+            ? "Saved. You can't make any of these."
+            : editor
+              ? "Dates updated."
+              : "Dates saved.",
+      });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -654,6 +667,7 @@ export default function GroupPage({ groupId, initialGroup }) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-6 sm:px-6 lg:px-10">
+      <SaveToast toast={toast} onDone={clearToast} />
       <div className="flex flex-col gap-3.5 py-5 lg:flex-row lg:items-end lg:justify-between lg:gap-6 lg:py-8">
         <div className="min-w-0">
           <Link
@@ -725,15 +739,6 @@ export default function GroupPage({ groupId, initialGroup }) {
             </p>
           ) : null}
 
-          {/*
-            Sighted confirmation is the strip vanishing, which happens at the
-            point of action; a line of text up here was showing outside the
-            reader's gaze and then leaving. A disappearance announces nothing,
-            though, so the message stays for screen readers.
-          */}
-          <p aria-live="polite" className="sr-only">
-            {feedback}
-          </p>
         </form>
 
         <section className="stack px-3.5 pt-[18px] pb-4 sm:px-5 lg:col-start-1 lg:row-start-1 lg:row-span-2">
