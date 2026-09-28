@@ -796,6 +796,15 @@ export default function GroupPage({ groupId, initialGroup }) {
             </div>
           ) : null}
 
+          {/* Said outright: without it, people could not tell whether a
+              picked day meant free or busy. */}
+          <p className="mb-3 text-[0.9375rem] leading-snug text-box-ink">
+            <b className="font-semibold text-lamp-soft">
+              Pick the days you&rsquo;re free.
+            </b>{" "}
+            Leave the days you&rsquo;re busy unpicked.
+          </p>
+
           <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
             {/* The window these dates cover — the meta line only gives a count,
                 and a long range spans months you would otherwise have to
