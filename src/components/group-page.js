@@ -333,50 +333,152 @@ function CalendarGrid({ months, total, liveByDate, onToggle }) {
   the first was tested first it swallowed the second, so a date you picked
   that everyone can make carried no sign you had picked it. Three of your own
   picks could render two different ways, which is what made it unreadable.
+
+  Expanding is its own button, not a tap on the row: the row picks the date,
+  and reaching for the names must never change your answer. The gap between
+  the two is dead space, so a near-miss on the chevron lands on nothing.
 */
-function DateList({ dateSummaries, total, liveByDate, onToggle }) {
+function DateList({
+  dateSummaries,
+  total,
+  liveByDate,
+  freeNamesByDate,
+  onToggle,
+}) {
+  const [openDates, setOpenDates] = useState(() => new Set());
+
+  function toggleOpen(date) {
+    setOpenDates((current) => {
+      const next = new Set(current);
+
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+
+      return next;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-1">
       {dateSummaries.map((summary) => {
         const live = liveByDate.get(summary.date);
         const ratio = total ? (live.count / total) * 100 : 0;
+        const open = openDates.has(summary.date);
+        const panelId = `free-${summary.date}`;
+        const names = freeNamesByDate.get(summary.date) || [];
 
         return (
-          <button
-            key={summary.date}
-            type="button"
-            onClick={() => onToggle(summary.date)}
-            aria-pressed={live.picked}
-            aria-label={`${formatShortLabel(summary.date)} — ${live.count} of ${total} can make it${live.picked ? ", including you" : ""}`}
-            className={`grid min-h-[46px] w-full grid-cols-[5.25rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-[background-color,border-color,box-shadow] hover:border-box-ink ${
-              live.picked
-                ? "border-box-rule bg-cell-mine shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)]"
-                : "border-cell-shut-line bg-cell-shut"
-            }`}
-          >
-            <span
-              className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
-            >
-              {formatShortLabel(summary.date)}
-            </span>
+          <div key={summary.date}>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => onToggle(summary.date)}
+                aria-pressed={live.picked}
+                aria-label={`${formatShortLabel(summary.date)} — ${live.count} of ${total} can make it${live.picked ? ", including you" : ""}`}
+                className={`hover:border-box-ink grid min-h-[46px] min-w-0 flex-1 grid-cols-[5.25rem_1fr_auto] items-center gap-3 rounded-[5px] border px-3 text-left font-mono text-[0.6875rem] tabular-nums transition-[background-color,border-color,box-shadow] ${
+                  live.picked
+                    ? "border-box-rule bg-cell-mine shadow-[inset_0_0_0_2px_rgba(255,231,176,0.85)]"
+                    : "border-cell-shut-line bg-cell-shut"
+                }`}
+              >
+                <span
+                  className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-[#dfe6e0]"}`}
+                >
+                  {formatShortLabel(summary.date)}
+                </span>
 
-            <span className="h-2 overflow-hidden rounded-full bg-[#1c2620]">
-              {/* the real ratio — the lit curve above is perception, not data */}
-              <span
-                className="block h-full rounded-full bg-lamp transition-[width] duration-200"
-                style={{ width: `${ratio}%` }}
-              />
-            </span>
+                <span className="h-2 overflow-hidden rounded-full bg-[#1c2620]">
+                  {/* the real ratio — the lit curve above is perception, not data */}
+                  <span
+                    className="bg-lamp block h-full rounded-full transition-[width] duration-200"
+                    style={{ width: `${ratio}%` }}
+                  />
+                </span>
 
-            <span
-              className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-box-ink"}`}
+                <span
+                  className={`whitespace-nowrap ${live.all ? "text-lamp-soft" : "text-box-ink"}`}
+                >
+                  {live.count} of {total}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => toggleOpen(summary.date)}
+                aria-expanded={open}
+                aria-controls={panelId}
+                aria-label={`${open ? "Hide" : "Show"} who's free on ${formatShortLabel(summary.date)}`}
+                className="border-cell-shut-line bg-cell-shut text-box-ink hover:border-box-ink flex min-h-[46px] w-12 shrink-0 items-center justify-center rounded-[5px] border transition-colors hover:text-[#dfe6e0]"
+              >
+                <Chevron open={open} />
+              </button>
+            </div>
+
+            {/* grid-rows 0fr→1fr animates to the content's own height */}
+            <div
+              id={panelId}
+              inert={!open}
+              className={`grid transition-[grid-template-rows] duration-200 ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
             >
-              {live.count} of {total}
-            </span>
-          </button>
+              <div className="overflow-hidden">
+                <p className="text-box-ink px-3 pt-2 pb-1 font-mono text-[0.6875rem] leading-relaxed">
+                  {names.length === 0 ? (
+                    "Nobody yet"
+                  ) : (
+                    <FreeNames names={names} />
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
         );
       })}
     </div>
+  );
+}
+
+// Reads like joinLabels, but "You" carries the lamp colour of your picked ring.
+function FreeNames({ names }) {
+  return names.map((name, index) => {
+    const separator =
+      index === 0 ? "" : index === names.length - 1 ? " and " : ", ";
+
+    return (
+      <span key={`${name}-${index}`}>
+        {separator}
+        <span
+          className={
+            name === "You" ? "text-lamp-soft font-medium" : "text-[#dfe6e0]"
+          }
+        >
+          {name}
+        </span>
+      </span>
+    );
+  });
+}
+
+function Chevron({ open }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+    >
+      <path
+        d="M3 5.25 7 9.25l4-4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -612,6 +714,24 @@ export default function GroupPage({ groupId, initialGroup }) {
       ];
     }),
   );
+
+  // Rebased the same way as the counts: your saved picks are dropped and your
+  // current ones added as "You", so the names always agree with "N of M".
+  const freeNamesByDate = new Map(group.dates.map((date) => [date, []]));
+
+  for (const response of group.responses) {
+    if (response.id === savedResponse?.id) {
+      continue;
+    }
+
+    for (const date of response.availableDates) {
+      freeNamesByDate.get(date)?.push(response.name);
+    }
+  }
+
+  for (const date of availableDates) {
+    freeNamesByDate.get(date)?.push("You");
+  }
 
   const liveCommon = group.dateSummaries
     .filter((summary) => liveByDate.get(summary.date).all)
@@ -858,6 +978,7 @@ export default function GroupPage({ groupId, initialGroup }) {
               dateSummaries={group.dateSummaries}
               total={liveTotal}
               liveByDate={liveByDate}
+              freeNamesByDate={freeNamesByDate}
               onToggle={toggleDate}
             />
           )}
